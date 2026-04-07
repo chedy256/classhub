@@ -8,25 +8,22 @@ Students can create public/private repos of course materials and discover other 
 - Flutter + Dart
 - Material Design 3
 - Geist font for all text
-- file_picker package (temporary, PC only)
+- file_picker package 
 
 ## File Structure
 lib/
 ├── main.dart
-├── screens/
-│   ├── landing_page.dart       ✅ finished
-│   ├── folder_selection.dart   🔄 working (PC file picker, temporary)
-│   └── main_screen.dart        🔄 working (UI in progress, not fully finished)
-
+├── core/
+├── onboarding/
+├── file_explorer/
+|-- shared/
 ## Screens Status
-- landing_page.dart → fully finished, custom dark UI
-- folder_selection.dart → working but uses PC file picker temporarily.
-  Will be replaced when collaborator finishes phone storage permission feature.
-- main_screen.dart → working on UI, but not fully finished. Still needs the 3-tab bottom navigation and content for each tab.
+- landing_page.dart → working on.
+...
+
 
 ## Pending Tasks
-- Replace FilePicker.getDirectoryPath() with phone storage picker and permission handling (collaborator's task)
-- Build main_screen.dart (3-tab bottom navigation) and content for each tab (my task)
+
 
 ## Design
 - Dark blue-black background palette with light blue accents
