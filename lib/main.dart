@@ -4,8 +4,8 @@ import 'package:dynamic_color/dynamic_color.dart';
 
 import 'package:classhub/core/services/storage_permission_service.dart';
 import 'package:classhub/core/services/classhub_path_service.dart';
-import 'package:classhub/onboarding/ui/screens/onboarding_screen.dart';
-import 'package:classhub/file_explorer/ui/screens/file_explorer_screen.dart';
+import 'package:classhub/onboarding/screens/onboarding_screen.dart';
+import 'package:classhub/file_explorer/screens/file_explorer_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
