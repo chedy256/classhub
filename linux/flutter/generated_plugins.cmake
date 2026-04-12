@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   dynamic_color
+  gtk
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
