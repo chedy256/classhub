@@ -8,7 +8,7 @@
 PRODUCT_NAME = classhub
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.classhub
+PRODUCT_BUNDLE_IDENTIFIER = com.knisium.classhub
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
