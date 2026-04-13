@@ -10,7 +10,7 @@ class FileExplorerScreen extends StatefulWidget {
 }
 
 class _FileExplorerScreenState extends State<FileExplorerScreen> {
-  final _deepLinkService = DeepLinkService();
+  final _linkService = LinkService();
 
   @override
   void initState() {
@@ -19,12 +19,11 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
   }
 
   Future<void> _initDeepLinks() async {
-    // Handle links received
-    _deepLinkService.linkStream.listen(_handleLink);
+    _linkService.linkStream.listen(_handleLink);
   }
 
   void _handleLink(Uri uri) {
-    final urls = _deepLinkService.extractAddUrls(uri);
+    final urls = _linkService.extractAddUrls(uri);
     if (urls.isEmpty || !mounted) return;
 
     Navigator.of(
@@ -34,7 +33,6 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // File explorer UI
     return const Scaffold(body: Center(child: Text('File Explorer')));
   }
 }
