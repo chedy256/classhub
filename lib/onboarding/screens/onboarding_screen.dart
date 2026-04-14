@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:classhub/onboarding/services/onboarding_service.dart';
-import 'package:classhub/file_explorer/screens/file_explorer_screen.dart';
+import 'package:classhub/file_explorer/screens/main_screen.dart';
+import 'package:classhub/core/services/classhub_path_service.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
@@ -9,9 +10,11 @@ class OnboardingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: FolderSelectionWrapper(
-        onComplete: () {
+        onComplete: () async {
+          final path = await ClasshubPathService.getPath();
+          if (!context.mounted) return;
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const FileExplorerScreen()),
+            MaterialPageRoute(builder: (_) => MainScreen(rootPath: path)),
           );
         },
       ),
