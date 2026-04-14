@@ -5,7 +5,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
 import 'package:classhub/core/services/classhub_path_service.dart';
 import 'package:classhub/onboarding/screens/onboarding_screen.dart';
-import 'package:classhub/file_explorer/screens/file_explorer_screen.dart';
+import 'package:classhub/file_explorer/screens/main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,12 +14,22 @@ void main() async {
   final bool hasPermission = await StoragePermissionService.hasPermission();
   final bool pathExists = await Directory(savedPath).exists();
 
-  runApp(ClasshubApp(isSetupComplete: hasPermission && pathExists));
+  runApp(
+    ClasshubApp(
+      isSetupComplete: hasPermission && pathExists,
+      savedPath: savedPath,
+    ),
+  );
 }
 
 class ClasshubApp extends StatelessWidget {
   final bool isSetupComplete;
-  const ClasshubApp({super.key, required this.isSetupComplete});
+  final String savedPath;
+  const ClasshubApp({
+    super.key,
+    required this.isSetupComplete,
+    required this.savedPath,
+  });
 
   // Fallback palette for devices without dynamic color (iOS, older Android)
   static const _fallbackSeed = Colors.indigo;
@@ -43,7 +53,9 @@ class ClasshubApp extends StatelessWidget {
           theme: ThemeData(colorScheme: lightScheme, useMaterial3: true),
           darkTheme: ThemeData(colorScheme: darkScheme, useMaterial3: true),
           themeMode: ThemeMode.system,
-          home: isSetupComplete ? FileExplorerScreen() : OnboardingScreen(),
+          home: isSetupComplete
+              ? MainScreen(rootPath: savedPath)
+              : const OnboardingScreen(),
           // home: HomeScreen(),
         );
       },
