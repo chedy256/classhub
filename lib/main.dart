@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-
+import 'package:classhub/onboarding/screens/landing_page.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
 import 'package:classhub/core/services/classhub_path_service.dart';
-import 'package:classhub/onboarding/screens/onboarding_screen.dart';
+
 import 'package:classhub/file_explorer/screens/main_screen.dart';
 
 void main() async {
@@ -17,18 +17,18 @@ void main() async {
   runApp(
     ClasshubApp(
       isSetupComplete: hasPermission && pathExists,
-      savedPath: savedPath,
+      rootPath: savedPath,
     ),
   );
 }
 
 class ClasshubApp extends StatelessWidget {
   final bool isSetupComplete;
-  final String savedPath;
+  final String rootPath;
   const ClasshubApp({
     super.key,
     required this.isSetupComplete,
-    required this.savedPath,
+    required this.rootPath,
   });
 
   // Fallback palette for devices without dynamic color (iOS, older Android)
@@ -50,13 +50,13 @@ class ClasshubApp extends StatelessWidget {
 
         return MaterialApp(
           title: 'Classhub',
+          debugShowCheckedModeBanner: false,
           theme: ThemeData(colorScheme: lightScheme, useMaterial3: true),
           darkTheme: ThemeData(colorScheme: darkScheme, useMaterial3: true),
           themeMode: ThemeMode.system,
           home: isSetupComplete
-              ? MainScreen(rootPath: savedPath)
-              : const OnboardingScreen(),
-          // home: HomeScreen(),
+              ? MainScreen(rootPath: rootPath)
+              : const LandingPage(),
         );
       },
     );
