@@ -1,3 +1,7 @@
+# sub package repo kept separate on purpose
+./lib/packages/sync_engine/.git/
+
+
 # Miscellaneous
 *.class
 *.log
