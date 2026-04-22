@@ -21,7 +21,11 @@ class HttpClient {
   Future<Map<String, dynamic>> getJson(String url) async {
     final response = await http.get(Uri.parse(url), headers: _headers);
 
-    if (response.statusCode != 200) {
+    if (response.statusCode == 403 || response.statusCode == 429) {
+      throw HttpException(
+        'Rate limit exceeded: GET $url returned ${response.statusCode}',
+      );
+    } else if (response.statusCode != 200) {
       throw HttpException(
         'GET $url returned ${response.statusCode}: ${response.body}',
       );

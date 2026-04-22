@@ -4,7 +4,13 @@
 enum SourceType { github, drive, classroom }
 
 /// The current synchronization state of a source.
-enum SyncStatus { idle, syncing, error, never }
+enum SyncStatus {
+  idle, // No sync in progress, last sync successful
+  syncing, // Sync in progress
+  error, // Temporary error (e.g., network issue, rate limit)
+  never, // Never synced before
+  fatalError, // Fatal error (e.g., branch not found, invalid URL)
+}
 
 class SourceConfig {
   final SourceType type;

@@ -74,24 +74,41 @@ class SyncEngine {
   }) async {
     try {
       final config = await _sourceStore.read(sourceFolder);
-      if (config.syncStatus == SyncStatus.error || forceFullSync) {
+
+      // Handle fatal errors (e.g., branch not found, invalid URL)
+      if (config.syncStatus == SyncStatus.fatalError) {
         print(
-          '[WARNING] Sync error detected from last attempt. Re-downloading all files to resolve issues...',
+          '[FATAL] Fatal error detected for ${config.url}. Source may be invalid or deleted.',
         );
+        print(
+          '[FATAL] Full re-sync will NOT fix this. Check the URL or source validity.',
+        );
+        return SyncResult.failure(
+          'Fatal error: Source may be invalid or deleted. Check the URL.',
+        );
+      }
+
+      // Handle temporary errors (e.g., rate limits, network issues, file write errors)
+      if (config.syncStatus == SyncStatus.error || forceFullSync) {
+        if (config.syncStatus == SyncStatus.error) {
+          print(
+            '[WARNING] Sync error detected from last attempt. Re-downloading all files to resolve issues...',
+          );
+        }
         try {
-          // Read the existing config to get the URL
           final config = await _sourceStore.read(sourceFolder);
           print(
             '[WARNING] Re-downloading all files for ${config.url} to fix sync problems...',
           );
-
-          // Re-add the source (this will overwrite the existing config and re-sync)
-          return await addSource(config.url);
+          return await addSource(
+            config.url,
+          ); // Full re-clone for recoverable errors
         } catch (e) {
           print('[ERROR] Failed to fix source: $e');
           return SyncResult.failure('Failed to fix source: $e');
         }
       }
+
       return await _performSync(sourceFolder);
     } catch (e) {
       print('[ERROR] Failed to sync source: $e');
@@ -119,6 +136,8 @@ class SyncEngine {
       final result = await _fileWriter.apply(sourceFolder, output.deltas);
 
       if (result.hasErrors) {
+        // File write errors are recoverable (retry with full clone)
+        await _sourceStore.updateStatus(sourceFolder, SyncStatus.error);
         throw Exception('File write errors: ${result.errors.join(", ")}');
       }
 
@@ -134,32 +153,62 @@ class SyncEngine {
         filesUpdated: result.filesUpdated,
         filesDeleted: result.filesDeleted,
       );
+    } on HttpException catch (e) {
+      final message = e.message.toLowerCase();
+      if (message.contains('403') || message.contains('429')) {
+        // Rate limit: temporary, retry later (no full clone)
+        await _sourceStore.updateStatus(sourceFolder, SyncStatus.error);
+        rethrow;
+      } else if (message.contains('404')) {
+        // Branch/repo not found: fatal (full clone generally won't help in most cases)
+        // keep as just error in case repo became private then back to public or other such cases it just requires a full reclone
+        await _sourceStore.updateStatus(sourceFolder, SyncStatus.error);
+        rethrow;
+      } else {
+        // Other HTTP errors (500, etc.): temporary
+        await _sourceStore.updateStatus(sourceFolder, SyncStatus.error);
+        rethrow;
+      }
+    } on SocketException catch (_) {
+      // Network issues(no internet): temporary
+      // Just ignore it, it will be fixed when connecting to the internet
+      await _sourceStore.updateStatus(sourceFolder, SyncStatus.idle);
+      return SyncResult.failure(
+        'Offline: Retry when connected to the internet.',
+      );
     } catch (e) {
+      // Default to temporary error
       await _sourceStore.updateStatus(sourceFolder, SyncStatus.error);
-      rethrow; // Propagate the exception to `syncSource` for printing
+      rethrow;
     }
   }
 }
 
-// just a quick test that can be run directly executing this file
-void main() async {
-  final appFolder = Directory('/tmp/classhub');
-  final syncEngine = SyncEngine(appFolder: appFolder);
-
-  late SyncResult result;
-  result = await syncEngine.addSource('https://github.com/octocat/Hello-World');
-  print(result.success ? 'Sync successful!' : 'Sync failed: ${result.error}');
-
-  // result = await syncEngine.addSource(
-  //   'https://github.com/titanknis/Hello-World',
-  // );
-  // print(result.success ? 'Sync successful!' : 'Sync failed: ${result.error}');
-
-  result = await syncEngine.addSource('https://github.com/titanknis/nixos');
-  print(result.success ? 'Sync successful!' : 'Sync failed: ${result.error}');
-
-  // result = await syncEngine.addSource(
-  //   'https://github.com/titanknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
-  // );
-  // print(result.success ? 'Sync successful!' : 'Sync failed: ${result.error}');
-}
+// // just a quick test that can be run directly executing this file
+// void main() async {
+//   final appFolder = Directory('/tmp/classhub');
+//   final syncEngine = SyncEngine(appFolder: appFolder);
+//   final parser = GithubParser();
+//   var url;
+//
+//   late SyncResult result;
+//   // result = await syncEngine.addSource('https://github.com/octocat/Hello-World');
+//   // print(result.success ? 'Sync successful!' : 'Sync failed: ${result.error}');
+//
+//   // result = await syncEngine.addSource(
+//   //   'https://github.com/titanknis/Hello-World',
+//   // );
+//   // print(result.success ? 'Sync successful!' : 'Sync failed: ${result.error}');
+//
+//   url = "https://github.com/titanknis/nixos";
+//   // result = await syncEngine.addSource(url);
+//   result = await syncEngine.syncSource(
+//     Directory('${appFolder.path}/${parser.getSourceFolderName(url)}'),
+//   );
+//   print(result.success ? 'Sync successful!' : 'Sync failed: ${result.error}');
+//
+//   // result = await syncEngine.addSource(
+//   //   'https://github.com/titanknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
+//   // );
+//   // print(result.success ? 'Sync successful!' : 'Sync failed: ${result.error}');
+// }
