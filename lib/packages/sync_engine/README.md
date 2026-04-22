@@ -1,39 +1,100 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# sync_engine
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+A Dart package for pulling and syncing course material from remote sources (GitHub, Google Drive, Google Classroom) to local storage. Built as the core of the [ClassHub](https://github.com/titanknis/classhub) mobile app.
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
+---
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+## What it does
 
-## Features
+- Fetches file changes from a remote source and applies them to a local folder
+- Tracks sync state per source (last synced commit, sync status, timestamps)
+- Supports full clone on first sync and incremental diff on subsequent syncs
+- Handles add, update, delete, and rename file operations
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+---
 
-## Getting started
+## Supported sources
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+| Source                | Status       |
+| --------------------- | ------------ |
+| GitHub (public repos) | -[x] Done    |
+| Google Drive          | -[ ] Planned |
+| Google Classroom      | -[ ] Planned |
+
+---
+
+## Architecture
+
+The package is organized in 4 layers. Each layer only depends on the one below it.
+
+```
+┌─────────────────────────────────┐
+│  4. SyncEngine (orchestrator)   │
+├─────────────────────────────────┤
+│  3. Source Parsers & Syncers    │
+├─────────────────────────────────┤
+│  2. Services (store, writer)    │
+├─────────────────────────────────┤
+│  1. Models                      │
+└─────────────────────────────────┘
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+
+---
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
 ```dart
-const like = 'sample';
+final engine = SyncEngine(appFolder: Directory('/path/to/app'));
+
+// Add a new source (parses URL, creates folder, runs initial sync)
+final result = await engine.addSource('https://github.com/owner/repo');
+
+// Sync an existing source
+final sourceFolder = Directory('/path/to/app/repo');
+final result = await engine.syncSource(sourceFolder);
+
+print(result.success);       // true
+print(result.filesAdded);    // files added this sync
+print(result.totalChanges);  // total files changed
 ```
 
-## Additional information
+Each source folder gets a `.source/source.json` file that tracks its configuration and sync state.
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+---
+
+## Project structure
+
+```
+lib/
+  sync_engine.dart
+  sync/
+    models/
+      file_delta.dart
+      source_config.dart
+      sync_result.dart
+      syncer_output.dart
+    services/
+      file_writer.dart
+      source_store.dart
+    sources/
+      source_parser.dart
+      source_syncer.dart
+      github/
+        http_client.dart
+        parser.dart
+        syncer.dart
+      drive/               # not implemented
+      classroom/           # not implemented
+```
+
+---
+
+## Running tests
+
+```bash
+dart test
+```
+
+Integration tests make real GitHub API calls and require network access.
