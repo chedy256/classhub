@@ -6,6 +6,7 @@
 - GitHub syncer — full clone (recursive tree API) and incremental diff (compare API)
 - `SourceStore` — reads/writes `source.json`, tracks sync state and checkpoint
 - Full test coverage for all components
+- Error recovery — auto-recover from sync failures (e.g., force pushes) by re-adding the source
 
 ## Up next
 
@@ -15,8 +16,8 @@
 
 ## Planned
 
+- **GitHub token support** — allow passing a personal access token for private repos and higher rate limits
 - **Google Drive support** — parser and syncer for public Drive folders
 - **Google Classroom support** — parser and syncer using the Classroom API
 - **Parallel downloads** — download multiple files concurrently to reduce sync time
-- **GitHub token support** — allow passing a personal access token for private repos and higher rate limits
 - **Selective sync** — allow excluding files or folders by pattern
