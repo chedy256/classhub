@@ -83,7 +83,7 @@ void main() {
           reason: 'Failed to sync source: ${syncResult.error}',
         );
 
-        // Verify files were synced (Hello-World repo has a README.md)
+        // Verify files were synced (Hello-World repo has a README)
         final readmeFile = File(path.join(sourceFolder.path, 'README'));
         expect(
           await readmeFile.exists(),
