@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
+import 'package:sync_engine/sync_engine.dart';
 import '../models/file_type_info.dart';
 import '../services/file_explorer_service.dart';
 import '../services/trash_service.dart';
@@ -94,6 +95,23 @@ class _MainScreenState extends State<MainScreen>
     if (path != null) {
       _fileExplorerService.copyFolderTo(widget.rootPath, path);
       _loadEntries();
+    }
+  }
+
+  Future<void> _addSource() async {
+    _toggleFab();
+    final url = await _showTextInputDialog(
+      context,
+      'Add Source',
+      'Paste a GitHub URL',
+      'Add',
+    );
+    if (url != null && url.isNotEmpty) {
+      final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
+      final result = await syncEngine.addSource(url);
+      if (result.success) {
+        _loadEntries();
+      }
     }
   }
 
@@ -463,7 +481,7 @@ class _MainScreenState extends State<MainScreen>
                           _FabOption(
                             label: 'Source',
                             icon: Icons.wifi_tethering,
-                            onTap: _toggleFab,
+                            onTap: _addSource,
                           ),
                           const SizedBox(height: 10),
                           _FabOption(

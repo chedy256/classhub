@@ -23,6 +23,14 @@ class FileExplorerService {
     return all;
   }
 
+  List<Directory> getSources(String rootPath) {
+    final entries = loadEntries(rootPath);
+    return entries
+        .whereType<Directory>()
+        .where((d) => File(p.join(d.path, '.source.json')).existsSync())
+        .toList();
+  }
+
   List<FileSystemEntity> loadFolderContents(String folderPath) {
     final dir = Directory(folderPath);
     if (!dir.existsSync()) return [];
