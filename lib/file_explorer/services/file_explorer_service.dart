@@ -23,11 +23,15 @@ class FileExplorerService {
     return all;
   }
 
+  bool isSyncedSource(String path) {
+    return File(p.join(path, '.source', 'source.json')).existsSync();
+  }
+
   List<Directory> getSources(String rootPath) {
     final entries = loadEntries(rootPath);
     return entries
         .whereType<Directory>()
-        .where((d) => File(p.join(d.path, '.source.json')).existsSync())
+        .where((d) => isSyncedSource(d.path))
         .toList();
   }
 

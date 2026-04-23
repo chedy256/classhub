@@ -185,7 +185,7 @@ class _MainScreenState extends State<MainScreen>
         builder: (_) => SearchScreen(rootPath: widget.rootPath),
       ),
     );
-    if (!mounted || selectedPath == null) return;
+if (!mounted || selectedPath == null) return;
     final type = FileSystemEntity.typeSync(selectedPath);
     if (type == FileSystemEntityType.directory) {
       await Navigator.push(
@@ -194,6 +194,7 @@ class _MainScreenState extends State<MainScreen>
           builder: (_) => _InsideFolderScreen(
             folderPath: selectedPath,
             rootPath: widget.rootPath,
+            isSynced: _fileExplorerService.isSyncedSource(selectedPath),
           ),
         ),
       );
@@ -379,6 +380,7 @@ class _MainScreenState extends State<MainScreen>
                                     builder: (_) => _InsideFolderScreen(
                                       folderPath: entity.path,
                                       rootPath: widget.rootPath,
+                                      isSynced: _fileExplorerService.isSyncedSource(entity.path),
                                     ),
                                   ),
                                 );
@@ -597,11 +599,133 @@ class _DrawerItem extends StatelessWidget {
   }
 }
 
+class _SyncedFab extends StatelessWidget {
+  final bool isSyncing;
+  final VoidCallback onSync;
+
+  const _SyncedFab({required this.isSyncing, required this.onSync});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: isSyncing ? null : onSync,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: isSyncing
+              ? SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                )
+              : Icon(
+                  Icons.sync,
+                  color: colorScheme.onPrimaryContainer,
+                  size: 28,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RegularFab extends StatelessWidget {
+  final bool isFabExpanded;
+  final AnimationController fabAnimController;
+  final Animation<double> fabAnimation;
+  final VoidCallback onToggle;
+  final VoidCallback onUploadFiles;
+  final VoidCallback onUploadFolder;
+  final ColorScheme colorScheme;
+
+  const _RegularFab({
+    required this.isFabExpanded,
+    required this.fabAnimController,
+    required this.fabAnimation,
+    required this.onToggle,
+    required this.onUploadFiles,
+    required this.onUploadFolder,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FadeTransition(
+          opacity: fabAnimation,
+          child: ScaleTransition(
+            scale: fabAnimation,
+            alignment: Alignment.bottomRight,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _FabOption(
+                  label: 'Upload folder',
+                  icon: Icons.drive_folder_upload_outlined,
+                  onTap: onUploadFolder,
+                ),
+                const SizedBox(height: 10),
+                _FabOption(
+                  label: 'Upload files',
+                  icon: Icons.upload_file_outlined,
+                  onTap: onUploadFiles,
+                ),
+                const SizedBox(height: 14),
+              ],
+            ),
+          ),
+        ),
+        GestureDetector(
+          onTap: onToggle,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            width: isFabExpanded ? 52 : 56,
+            height: isFabExpanded ? 52 : 56,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(
+                isFabExpanded ? 26 : 16,
+              ),
+            ),
+            child: AnimatedRotation(
+              turns: isFabExpanded ? 0.125 : 0,
+              duration: const Duration(milliseconds: 250),
+              child: Icon(
+                isFabExpanded ? Icons.close : Icons.add,
+                color: colorScheme.onPrimaryContainer,
+                size: 28,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _InsideFolderScreen extends StatefulWidget {
   final String folderPath;
   final String rootPath;
+  final bool isSynced;
 
-  const _InsideFolderScreen({required this.folderPath, required this.rootPath});
+  const _InsideFolderScreen({
+    required this.folderPath,
+    required this.rootPath,
+    this.isSynced = false,
+  });
 
   @override
   State<_InsideFolderScreen> createState() => _InsideFolderScreenState();
@@ -614,6 +738,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
   List<FileSystemEntity> _files = [];
   final Set<int> _selectedIndices = {};
   bool _isSelecting = false;
+  bool _isSyncing = false;
   bool _isFabExpanded = false;
   late AnimationController _fabAnimController;
   late Animation<double> _fabAnimation;
@@ -674,6 +799,30 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     if (path != null) {
       _fileExplorerService.copyFolderTo(widget.folderPath, path);
       _loadFiles();
+    }
+  }
+
+  Future<void> _syncSource() async {
+    setState(() => _isSyncing = true);
+    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
+    final result = await syncEngine.syncSource(Directory(widget.folderPath));
+    setState(() => _isSyncing = false);
+    if (!mounted) return;
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      _loadFiles();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sync failed: ${result.error}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -909,69 +1058,24 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                     );
                   },
                 ),
-          if (_isFabExpanded && !_isSelecting)
-            GestureDetector(
-              onTap: _toggleFab,
-              child: Container(color: Colors.black54),
-            ),
           if (!_isSelecting)
             Positioned(
               right: 16,
               bottom: 40,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FadeTransition(
-                    opacity: _fabAnimation,
-                    child: ScaleTransition(
-                      scale: _fabAnimation,
-                      alignment: Alignment.bottomRight,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _FabOption(
-                            label: 'Upload folder',
-                            icon: Icons.drive_folder_upload_outlined,
-                            onTap: _uploadFolder,
-                          ),
-                          const SizedBox(height: 10),
-                          _FabOption(
-                            label: 'Upload files',
-                            icon: Icons.upload_file_outlined,
-                            onTap: _uploadFiles,
-                          ),
-                          const SizedBox(height: 14),
-                        ],
-                      ),
+              child: widget.isSynced
+                  ? _SyncedFab(
+                      isSyncing: _isSyncing,
+                      onSync: _syncSource,
+                    )
+                  : _RegularFab(
+                      isFabExpanded: _isFabExpanded,
+                      fabAnimController: _fabAnimController,
+                      fabAnimation: _fabAnimation,
+                      onToggle: _toggleFab,
+                      onUploadFiles: _uploadFiles,
+                      onUploadFolder: _uploadFolder,
+                      colorScheme: colorScheme,
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: _toggleFab,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: _isFabExpanded ? 52 : 56,
-                      height: _isFabExpanded ? 52 : 56,
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(
-                          _isFabExpanded ? 26 : 16,
-                        ),
-                      ),
-                      child: AnimatedRotation(
-                        turns: _isFabExpanded ? 0.125 : 0,
-                        duration: const Duration(milliseconds: 250),
-                        child: Icon(
-                          _isFabExpanded ? Icons.close : Icons.add,
-                          color: colorScheme.onPrimaryContainer,
-                          size: 28,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
         ],
       ),
