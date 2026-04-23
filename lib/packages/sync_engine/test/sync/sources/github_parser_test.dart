@@ -102,6 +102,19 @@ void main() {
         ); // Only 'main' is the branch, not 'main/Semestre2'
       });
 
+      test('parses branch without https://', () {
+        // This is the key test for your issue
+        final (owner, repo, branch) = parser.parseUrl(
+          'github.com/titanknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
+        );
+        expect(owner, equals('titanknis'));
+        expect(repo, equals('ISIMM-L2-Info-Cours'));
+        expect(
+          branch,
+          equals('main'),
+        ); // Only 'main' is the branch, not 'main/Semestre2'
+      });
+
       test('parses branch with actual slashes', () {
         final (owner, repo, branch) = parser.parseUrl(
           'https://github.com/owner/repo/tree/feature/new-feature',

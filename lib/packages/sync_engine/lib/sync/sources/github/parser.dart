@@ -49,6 +49,9 @@ class GithubParser implements SourceParser {
       path = url.split('git@github.com:').last.split('.git').first;
     } else {
       // Handle https://github.com/owner/repo or github.com/owner/repo
+      if (url.startsWith('github.com/')) {
+        url = "https://$url";
+      }
       final uri = Uri.parse(url);
       path = uri.path;
     }
