@@ -1146,14 +1146,9 @@ void _showEntityMenu(
             },
           ),
           ListTile(
-            leading: const Icon(Icons.copy_outlined),
-            title: const Text('Copy path'),
+            leading: const Icon(Icons.share_outlined),
+            title: const Text('Share source'),
             onTap: () {
-              Navigator.pop(ctx);
-              Clipboard.setData(ClipboardData(text: entity.path));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Path copied to clipboard')),
-              );
             },
           ),
         ],
