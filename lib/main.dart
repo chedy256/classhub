@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:sync_engine/sync_engine.dart';
+import 'package:sync_engine/sync/models/source_config.dart';
 import 'package:classhub/core/theme/app_theme.dart';
 import 'package:classhub/onboarding/screens/landing_page1.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
