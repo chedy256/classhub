@@ -28,14 +28,12 @@ class LinkService {
   /// Partage le lien via le système natif
   Future<void> shareSheet(List<String> urls) async {
     final link = buildAddSourcesDeepLinkString(urls);
-    print("LIEN PARTAGÉ: $link");
     await Share.share(link);
   }
 
   /// Copie le lien dans le presse-papiers
   Future<void> copyToClipboard(List<String> urls) async {
     final link = buildAddSourcesDeepLinkString(urls);
-    print(" LIEN COPIÉ: $link");
     await Clipboard.setData(ClipboardData(text: link));
   }
 

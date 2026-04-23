@@ -86,41 +86,22 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFF090C14);
-    const cardColor = Color(0xFF111827);
-    const accentBlue = Color(0xFF80A3FF);
-    const subtitleColor = Color(0xFF6B7280);
-    const borderColor = Color(0xFF1F2937);
-
     final showRecent =
         !_hasSearched && _controller.text.isEmpty && _recentSearches.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: bgColor,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: TextField(
           controller: _controller,
           focusNode: _focusNode,
           onChanged: (_) => _liveSearch(),
           onSubmitted: (_) => _commitSearch(),
-          style: const TextStyle(color: Colors.white, fontSize: 15),
           decoration: InputDecoration(
             hintText: 'Search in ClassHub',
-            hintStyle: const TextStyle(color: subtitleColor, fontSize: 15),
             border: InputBorder.none,
             suffixIcon: _controller.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: subtitleColor,
-                      size: 20,
-                    ),
+                    icon: const Icon(Icons.close),
                     onPressed: () {
                       _controller.clear();
                       setState(() {
@@ -164,40 +145,40 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
       body: showRecent
-          ? _buildRecentSearches(subtitleColor, accentBlue)
+          ? _buildRecentSearches()
           : _hasSearched
-          ? _buildResults(
-              bgColor,
-              cardColor,
-              accentBlue,
-              subtitleColor,
-              borderColor,
-            )
-          : _buildEmptyPrompt(subtitleColor),
+              ? _buildResults()
+              : _buildEmptyPrompt(),
     );
   }
 
-  Widget _buildEmptyPrompt(Color subtitleColor) {
+  Widget _buildEmptyPrompt() {
+    final theme = Theme.of(context);
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.search,
-            color: subtitleColor.withValues(alpha: 0.3),
+            color: theme.colorScheme.onSurfaceVariant,
             size: 64,
           ),
           const SizedBox(height: 16),
           Text(
             'Search for files and folders',
-            style: TextStyle(color: subtitleColor, fontSize: 14),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRecentSearches(Color subtitleColor, Color accentBlue) {
+  Widget _buildRecentSearches() {
+    final theme = Theme.of(context);
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: [
@@ -207,11 +188,8 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               Text(
                 'Recent searches',
-                style: TextStyle(
-                  color: subtitleColor,
-                  fontSize: 12,
+                style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
                 ),
               ),
               const Spacer(),
@@ -222,9 +200,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 },
                 child: Text(
                   'Clear all',
-                  style: TextStyle(
-                    color: accentBlue,
-                    fontSize: 12,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -236,13 +213,10 @@ class _SearchScreenState extends State<SearchScreen> {
           (query) => ListTile(
             dense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-            leading: Icon(Icons.history, color: subtitleColor, size: 20),
-            title: Text(
-              query,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-            ),
+            leading: Icon(Icons.history),
+            title: Text(query),
             trailing: IconButton(
-              icon: Icon(Icons.close, color: subtitleColor, size: 18),
+              icon: const Icon(Icons.close),
               onPressed: () => _removeRecent(query),
             ),
             onTap: () => _onRecentTap(query),
@@ -252,13 +226,10 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildResults(
-    Color bgColor,
-    Color cardColor,
-    Color accentBlue,
-    Color subtitleColor,
-    Color borderColor,
-  ) {
+  Widget _buildResults() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     if (_results.isEmpty) {
       return Center(
         child: Column(
@@ -266,13 +237,15 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             Icon(
               Icons.search_off,
-              color: subtitleColor.withValues(alpha: 0.4),
+              color: colorScheme.onSurfaceVariant,
               size: 64,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No results found',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -289,56 +262,52 @@ class _SearchScreenState extends State<SearchScreen> {
         final name = p.basename(entity.path);
         final info = FileTypeInfo.classify(name, isDirectory: isDir);
         final subtitle = _fileExplorerService.entitySubtitle(entity);
-        // Show relative path from root
         final relativePath = p.relative(entity.path, from: widget.rootPath);
         final parentPath = p.dirname(relativePath);
 
-        return GestureDetector(
-          onTap: () => Navigator.pop(context, entity.path),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: borderColor, width: 1),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: accentBlue.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
+        return Card(
+          child: InkWell(
+            onTap: () => Navigator.pop(context, entity.path),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(info.icon, color: colorScheme.onPrimaryContainer),
                   ),
-                  child: Icon(info.icon, color: accentBlue, size: 22),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        parentPath != '.'
-                            ? '$subtitle  •  $parentPath'
-                            : subtitle,
-                        style: TextStyle(color: subtitleColor, fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          parentPath != '.'
+                              ? '$subtitle · $parentPath'
+                              : subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -362,7 +331,7 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const accentBlue = Color(0xFF80A3FF);
+    final theme = Theme.of(context);
 
     return GestureDetector(
       onTap: onTap,
@@ -371,14 +340,13 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected
-              ? accentBlue.withValues(alpha: 0.15)
-              : const Color(0xFF111827),
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
-                ? accentBlue.withValues(alpha: 0.5)
-                : const Color(0xFF1F2937),
-            width: 1,
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant,
           ),
         ),
         child: Row(
@@ -388,15 +356,15 @@ class _FilterChip extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: selected ? accentBlue : const Color(0xFF6B7280),
               ),
               const SizedBox(width: 6),
             ],
             Text(
               label,
-              style: TextStyle(
-                color: selected ? accentBlue : const Color(0xFF6B7280),
-                fontSize: 13,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: selected
+                    ? theme.colorScheme.onPrimaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),

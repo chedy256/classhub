@@ -43,6 +43,8 @@ dependencies:
   share_plus: ^10.1.4
   open_file: ^3.5.11
   flutter_launcher_icons: ^0.14.4
+  url_launcher: ^6.3.1
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:

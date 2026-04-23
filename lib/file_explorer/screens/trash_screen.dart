@@ -31,7 +31,6 @@ class _TrashScreenState extends State<TrashScreen> {
     _trashService.purgeExpired(widget.rootPath);
     setState(() {
       _items = _trashService.loadManifest(widget.rootPath);
-      // Sort newest first
       _items.sort((a, b) => b.deletedAt.compareTo(a.deletedAt));
       _selectedIndices.clear();
       if (_items.isEmpty) _isSelecting = false;
@@ -80,14 +79,9 @@ class _TrashScreenState extends State<TrashScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF151822),
-        title: const Text(
-          'Delete permanently?',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Delete permanently?'),
         content: Text(
           'This will permanently delete ${toDelete.length} item${toDelete.length > 1 ? 's' : ''}. This cannot be undone.',
-          style: const TextStyle(color: Color(0xFF8C95A6)),
         ),
         actions: [
           TextButton(
@@ -100,7 +94,7 @@ class _TrashScreenState extends State<TrashScreen> {
               _trashService.permanentlyDeleteItems(widget.rootPath, toDelete);
               _load();
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -110,36 +104,26 @@ class _TrashScreenState extends State<TrashScreen> {
   void _showItemActions(TrashItem item, int index) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF151822),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.restore, color: Color(0xFF80A3FF)),
-              title: const Text(
-                'Restore',
-                style: TextStyle(color: Colors.white),
-              ),
+              leading: const Icon(Icons.restore),
+              title: const Text('Restore'),
               onTap: () {
                 Navigator.pop(ctx);
                 _trashService.restoreItem(widget.rootPath, item);
                 _load();
                 if (!mounted) return;
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('Item restored')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Item restored')),
+                );
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_forever, color: Colors.red),
-              title: const Text(
-                'Delete permanently',
-                style: TextStyle(color: Colors.red),
-              ),
+              leading: const Icon(Icons.delete_forever),
+              title: const Text('Delete permanently'),
               onTap: () {
                 Navigator.pop(ctx);
                 _trashService.permanentlyDelete(widget.rootPath, item);
@@ -161,45 +145,26 @@ class _TrashScreenState extends State<TrashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFF090C14);
-    const cardColor = Color(0xFF111827);
-    const accentBlue = Color(0xFF80A3FF);
-    const subtitleColor = Color(0xFF6B7280);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: bgColor,
-        surfaceTintColor: Colors.transparent,
         leading: _isSelecting
             ? IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
+                icon: Icon(Icons.close),
                 onPressed: () => setState(() {
                   _selectedIndices.clear();
                   _isSelecting = false;
                 }),
               )
             : IconButton(
-                icon: const Icon(Icons.arrow_back, color: accentBlue),
+                icon: const Icon(Icons.arrow_back),
                 onPressed: () => Navigator.pop(context),
               ),
         title: _isSelecting
-            ? Text(
-                '${_selectedIndices.length} selected',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              )
-            : const Text(
-                'Trash',
-                style: TextStyle(
-                  color: accentBlue,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+            ? Text('${_selectedIndices.length} selected')
+            : const Text('Trash'),
         actions: _isSelecting
             ? [
                 IconButton(
@@ -207,11 +172,7 @@ class _TrashScreenState extends State<TrashScreen> {
                     _selectedIndices.length == _items.length
                         ? Icons.deselect
                         : Icons.select_all,
-                    color: accentBlue,
                   ),
-                  tooltip: _selectedIndices.length == _items.length
-                      ? 'Deselect all'
-                      : 'Select all',
                   onPressed: _selectAll,
                 ),
               ]
@@ -219,51 +180,23 @@ class _TrashScreenState extends State<TrashScreen> {
       ),
       bottomNavigationBar: _isSelecting && _selectedIndices.isNotEmpty
           ? SafeArea(
-              child: Container(
-                color: const Color(0xFF0F1420),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _restoreSelected,
-                        icon: const Icon(Icons.restore, size: 18),
-                        label: const Text(
-                          'Restore',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: accentBlue,
-                          side: BorderSide(
-                            color: accentBlue.withValues(alpha: 0.5),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+                        icon: const Icon(Icons.restore),
+                        label: const Text('Restore'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton.icon(
                         onPressed: _deleteSelected,
-                        icon: const Icon(Icons.delete_forever, size: 18),
-                        label: const Text(
-                          'Delete',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.red.shade800,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+                        icon: const Icon(Icons.delete_forever),
+                        label: const Text('Delete'),
                       ),
                     ),
                   ],
@@ -278,13 +211,15 @@ class _TrashScreenState extends State<TrashScreen> {
                 children: [
                   Icon(
                     Icons.delete_outline,
-                    color: subtitleColor.withValues(alpha: 0.4),
+                    color: colorScheme.onSurfaceVariant,
                     size: 64,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Trash is empty',
-                    style: TextStyle(color: subtitleColor, fontSize: 14),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -301,146 +236,128 @@ class _TrashScreenState extends State<TrashScreen> {
                 final sizeStr = _fileExplorerService.formatSize(size);
                 final isSelected = _selectedIndices.contains(index);
 
-                return GestureDetector(
-                  onTap: () {
-                    if (_isSelecting) {
+                return Card(
+                  color: isSelected
+                      ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                      : null,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      if (_isSelecting) {
+                        _toggleSelect(index);
+                      } else {
+                        _showItemActions(item, index);
+                      }
+                    },
+                    onLongPress: () {
+                      if (!_isSelecting) {
+                        setState(() => _isSelecting = true);
+                      }
                       _toggleSelect(index);
-                    } else {
-                      _showItemActions(item, index);
-                    }
-                  },
-                  onLongPress: () {
-                    if (!_isSelecting) {
-                      setState(() => _isSelecting = true);
-                    }
-                    _toggleSelect(index);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? accentBlue.withValues(alpha: 0.1)
-                          : cardColor,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isSelected
-                            ? accentBlue.withValues(alpha: 0.5)
-                            : const Color(0xFF1F2937),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        // Icon / Checkbox
-                        if (_isSelecting)
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? accentBlue.withValues(alpha: 0.2)
-                                  : accentBlue.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10),
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          if (_isSelecting)
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? colorScheme.primaryContainer
+                                    : colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                isSelected
+                                    ? Icons.check_circle
+                                    : Icons.circle_outlined,
+                                color: isSelected
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                            )
+                          else
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(info.icon),
                             ),
-                            child: Icon(
-                              isSelected
-                                  ? Icons.check_circle
-                                  : Icons.circle_outlined,
-                              color: isSelected ? accentBlue : subtitleColor,
-                              size: 22,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      info.icon,
+                                      color: colorScheme.onSurfaceVariant,
+                                      size: 12,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      info.label,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '·',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      sizeStr,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          )
-                        else
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: accentBlue.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(info.icon, color: accentBlue, size: 22),
                           ),
-                        const SizedBox(width: 14),
-                        // Name + metadata
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
+                          if (!_isSelecting)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: item.daysRemaining <= 7
+                                    ? colorScheme.errorContainer
+                                    : colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${item.daysRemaining}d',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: item.daysRemaining <= 7
+                                      ? colorScheme.onErrorContainer
+                                      : colorScheme.onSurfaceVariant,
                                   fontWeight: FontWeight.w600,
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    info.icon,
-                                    color: subtitleColor,
-                                    size: 12,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    info.label,
-                                    style: const TextStyle(
-                                      color: subtitleColor,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text(
-                                    '\u2022',
-                                    style: TextStyle(
-                                      color: subtitleColor,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    sizeStr,
-                                    style: const TextStyle(
-                                      color: subtitleColor,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Days remaining badge
-                        if (!_isSelecting)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: item.daysRemaining <= 7
-                                  ? Colors.red.withValues(alpha: 0.15)
-                                  : accentBlue.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${item.daysRemaining}d',
-                              style: TextStyle(
-                                color: item.daysRemaining <= 7
-                                    ? Colors.red.shade300
-                                    : subtitleColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
