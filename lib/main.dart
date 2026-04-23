@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:classhub/onboarding/screens/landing_page.dart';
+import 'package:classhub/core/theme/app_theme.dart';
+import 'package:classhub/onboarding/screens/landing_page1.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
 import 'package:classhub/core/services/classhub_path_service.dart';
 
@@ -31,32 +32,19 @@ class ClasshubApp extends StatelessWidget {
     required this.rootPath,
   });
 
-  // Fallback palette for devices without dynamic color (iOS, older Android)
-  static const _fallbackSeed = Colors.indigo;
-
   @override
   Widget build(BuildContext context) {
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
-        final lightScheme =
-            lightDynamic?.harmonized() ??
-            ColorScheme.fromSeed(seedColor: _fallbackSeed);
-        final darkScheme =
-            darkDynamic?.harmonized() ??
-            ColorScheme.fromSeed(
-              seedColor: _fallbackSeed,
-              brightness: Brightness.dark,
-            );
-
         return MaterialApp(
           title: 'Classhub',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(colorScheme: lightScheme, useMaterial3: true),
-          darkTheme: ThemeData(colorScheme: darkScheme, useMaterial3: true),
+          theme: AppTheme.build(lightDynamic, Brightness.light),
+          darkTheme: AppTheme.build(darkDynamic, Brightness.dark),
           themeMode: ThemeMode.system,
           home: isSetupComplete
               ? MainScreen(rootPath: rootPath)
-              : const LandingPage(),
+              : const LandingPage1(),
         );
       },
     );

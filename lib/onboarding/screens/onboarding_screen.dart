@@ -9,11 +9,9 @@ class OnboardingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: FolderSelectionWrapper(
-        onComplete: (String path) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => MainScreen(rootPath: path)),
-          );
-        },
+        onComplete: (path) => Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => MainScreen(rootPath: path)),
+        ),
       ),
     );
   }
@@ -30,230 +28,116 @@ class FolderSelectionWrapper extends StatefulWidget {
 class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
   String? _selectedPath;
   bool _isLoading = false;
-  String? _errorMessage;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadExistingPath();
+    _loadSaved();
   }
 
-  Future<void> _loadExistingPath() async {
+  Future<void> _loadSaved() async {
     final saved = await OnboardingService.loadSavedPath();
-    if (saved != null && mounted) {
-      setState(() => _selectedPath = saved);
-    }
+    if (saved != null && mounted) setState(() => _selectedPath = saved);
   }
 
-  Future<void> _handlePickFolder() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _pickFolder() async {
+    setState(() { _isLoading = true; _error = null; });
 
     final result = await OnboardingService.pickFolder();
-    final hasPermission = result['hasPermission'] as bool;
-    final path = result['path'] as String?;
-
     if (!mounted) return;
 
-    if (!hasPermission) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage =
-            'Storage permission denied. Please grant it in app settings.';
-      });
+    if (result['hasPermission'] != true) {
+      setState(() { _isLoading = false; _error = 'Storage permission denied.'; });
       return;
     }
 
-    if (path != null) {
-      final valid = await OnboardingService.validatePath(path);
-      if (!mounted) return;
-
-      if (valid) {
-        setState(() {
-          _selectedPath = path;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Selected path does not exist. Please try again.';
-        });
-      }
-    } else {
+    final path = result['path'] as String?;
+    if (path == null) {
       setState(() => _isLoading = false);
+      return;
     }
+
+    final valid = await OnboardingService.validatePath(path);
+    if (!mounted) return;
+
+    setState(() {
+      _selectedPath = valid ? path : null;
+      _isLoading = false;
+      if (!valid) _error = 'Selected path does not exist.';
+    });
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return FolderSelectionScreen(
-      selectedPath: _selectedPath,
-      isLoading: _isLoading,
-      errorMessage: _errorMessage,
-      onPickFolder: _handlePickFolder,
-      onNext: _selectedPath != null ? () => widget.onComplete(_selectedPath!) : null,
-    );
-  }
-}
-
-class FolderSelectionScreen extends StatelessWidget {
-  final String? selectedPath;
-  final bool isLoading;
-  final String? errorMessage;
-  final VoidCallback onPickFolder;
-  final VoidCallback? onNext;
-
-  const FolderSelectionScreen({
-    super.key,
-    required this.selectedPath,
-    required this.isLoading,
-    required this.errorMessage,
-    required this.onPickFolder,
-    required this.onNext,
-  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final bool folderSelected = selectedPath != null;
+    final hasFolder = _selectedPath != null;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F1523),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.rocket_launch_outlined,
-                color: colorScheme.primary,
-                size: 40,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Welcome!',
-                style: theme.textTheme.headlineLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "Let's set some things up first. You can always change these in the settings later too.",
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white70,
-                ),
-              ),
-              const SizedBox(height: 40),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1C2333),
-                  borderRadius: BorderRadius.circular(16),
-                ),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.folder_open_outlined, color: colorScheme.primary, size: 48),
+            const SizedBox(height: 24),
+            Text("Let's Go!", style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Choose a folder for ClassHub to store your files.', style: theme.textTheme.bodyLarge),
+            const SizedBox(height: 40),
+            Card(
+              child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Select a folder where ClassHub will store lessons, files, sources and more.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'A dedicated folder is recommended.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    RichText(
-                      text: TextSpan(
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white54,
+                    Row(
+                      children: [
+                        Icon(Icons.folder_outlined, color: colorScheme.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _selectedPath ?? 'No folder selected',
+                            style: theme.textTheme.bodyMedium,
+                          ),
                         ),
+                      ],
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          const TextSpan(text: 'Selected folder: '),
-                          TextSpan(
-                            text: selectedPath ?? 'No storage location set',
-                            style: const TextStyle(color: Colors.white70),
-                          ),
+                          Icon(Icons.error_outline, color: colorScheme.error, size: 16),
+                          const SizedBox(width: 8),
+                          Text(_error!, style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.error)),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: isLoading ? null : onPickFolder,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: folderSelected
-                              ? const Color(0xFF1C2333)
-                              : colorScheme.primary,
-                          foregroundColor: folderSelected
-                              ? Colors.white
-                              : colorScheme.onPrimary,
-                          side: folderSelected
-                              ? const BorderSide(color: Colors.white24)
-                              : BorderSide.none,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                folderSelected
-                                    ? 'Folder selected'
-                                    : 'Select a folder',
-                              ),
-                      ),
-                    ),
-                    if (errorMessage != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        errorMessage!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.error,
-                        ),
                       ),
                     ],
                   ],
                 ),
               ),
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onNext,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: onNext != null
-                        ? colorScheme.primary
-                        : const Color(0xFF1C2333),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Next'),
-                ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _isLoading ? null : _pickFolder,
+                icon: _isLoading
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(hasFolder ? Icons.check : Icons.folder_open_outlined, size: 18),
+                label: Text(hasFolder ? 'Change Folder' : 'Select Folder'),
               ),
-            ],
-          ),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: hasFolder ? () => widget.onComplete(_selectedPath!) : null,
+                child: const Text('Finish'),
+              ),
+            ),
+          ],
         ),
       ),
     );

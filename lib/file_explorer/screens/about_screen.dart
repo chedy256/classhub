@@ -5,29 +5,47 @@ class AboutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF090C14),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF090C14),
-        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'About',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        title: const Text('About'),
       ),
-      body: const Center(
-        child: Text(
-          'About',
-          style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
-        ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          Icon(
+            Icons.folder_copy,
+            size: 80,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'ClassHub',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Version 1.0.0',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          Text(
+            'Sync files from GitHub, Google Classroom, and more to your device.',
+            style: theme.textTheme.bodyLarge,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
