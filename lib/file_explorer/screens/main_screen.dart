@@ -280,7 +280,7 @@ class _MainScreenState extends State<MainScreen>
               ),
         title: _isSelecting
             ? Text('${_selectedIndices.length} selected')
-            : const Text('Classhub'),
+            : const Text('ClassHub'),
         actions: _isSelecting
             ? [
                 IconButton(

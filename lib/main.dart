@@ -37,7 +37,7 @@ class ClasshubApp extends StatelessWidget {
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         return MaterialApp(
-          title: 'Classhub',
+          title: 'ClassHub',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.build(lightDynamic, Brightness.light),
           darkTheme: AppTheme.build(darkDynamic, Brightness.dark),
