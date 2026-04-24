@@ -80,7 +80,7 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.folder_open_outlined, color: colorScheme.primary, size: 48),
+            Icon(Icons.rocket_launch_outlined, color: colorScheme.primary, size: 48),
             const SizedBox(height: 24),
             Text("Let's Go!", style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -94,7 +94,6 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.folder_outlined, color: colorScheme.primary, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
