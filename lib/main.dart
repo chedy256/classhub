@@ -6,7 +6,6 @@ import 'package:classhub/core/theme/app_theme.dart';
 import 'package:classhub/onboarding/screens/landing_page1.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
 import 'package:classhub/core/services/classhub_path_service.dart';
-import 'package:classhub/share/services/deep_link_service.dart';
 
 import 'package:classhub/file_explorer/screens/main_screen.dart';
 
@@ -19,18 +18,11 @@ void main() async {
   final hasPermission = await StoragePermissionService.hasPermission();
   final pathExists = await Directory(savedPath).exists();
 
-  final linkService = LinkService();
-  final initialUri = await linkService.getInitialLink();
-  final List<String> incomingUrls = initialUri != null
-      ? linkService.extractAddUrls(initialUri)
-      : <String>[];
-
   runApp(
     ClasshubApp(
       isSetupComplete: hasPermission && pathExists,
       rootPath: savedPath,
       initialThemeMode: savedThemeMode,
-      incomingUrls: incomingUrls,
     ),
   );
 }
@@ -39,13 +31,11 @@ class ClasshubApp extends StatefulWidget {
   final bool isSetupComplete;
   final String rootPath;
   final ThemeMode initialThemeMode;
-  final List<String> incomingUrls;
   const ClasshubApp({
     super.key,
     required this.isSetupComplete,
     required this.rootPath,
     required this.initialThemeMode,
-    this.incomingUrls = const [],
   });
 
   @override
@@ -106,7 +96,6 @@ class _ClasshubAppState extends State<ClasshubApp> {
               ? MainScreen(
                   rootPath: widget.rootPath,
                   onThemeChanged: updateTheme,
-                  incomingUrls: widget.incomingUrls,
                 )
               : const LandingPage1(),
         );
