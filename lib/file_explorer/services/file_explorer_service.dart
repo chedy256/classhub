@@ -102,7 +102,9 @@ class FileExplorerService {
   int countChildren(FileSystemEntity entity) {
     if (entity is Directory) {
       try {
-        return entity.listSync().length;
+        return entity.listSync()
+            .where((e) => !p.basename(e.path).startsWith('.'))
+            .length;
       } catch (_) {
         return 0;
       }
