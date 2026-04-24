@@ -325,16 +325,7 @@ class _MainScreenState extends State<MainScreen>
                 },
               ),
               const Spacer(),
-              const Divider(),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'v1.0.0',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
+              
             ],
           ),
         ),
