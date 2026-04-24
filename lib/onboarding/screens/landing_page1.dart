@@ -28,7 +28,7 @@ class LandingPage1 extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'Organize Your\nCourse\nMaterials',
+                'All Courses\nOne Place',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.displayMedium?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -38,8 +38,7 @@ class LandingPage1 extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'GitHub meets Google Classroom - '
-                'Locally. A professional workspace\ndesigned for students.',
+                'Built by students, for students.\nAll your documents locally on your device.\nYours to keep yours to control.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: colorScheme.onSurfaceVariant,
