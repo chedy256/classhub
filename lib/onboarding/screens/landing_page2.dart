@@ -28,18 +28,6 @@ class LandingPage2 extends StatelessWidget {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 60),
-                  Text(
-                    'Features',
-                    style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Everything you need to manage your academic files.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 40),
-
                   _FeatureCard(
                     title: 'Local Repository Sync',
                     description: 'Manage files with Git-like efficiency',
