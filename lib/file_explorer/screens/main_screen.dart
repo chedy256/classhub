@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
@@ -16,8 +15,9 @@ import 'about_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final String rootPath;
+  final void Function(ThemeMode)? onThemeChanged;
 
-  const MainScreen({super.key, required this.rootPath});
+  const MainScreen({super.key, required this.rootPath, this.onThemeChanged});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -230,7 +230,11 @@ if (!mounted || selectedPath == null) return;
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => SettingsScreen(
+                        onThemeChanged: widget.onThemeChanged,
+                      ),
+                    ),
                   );
                 },
               ),

@@ -3,7 +3,9 @@ import 'package:classhub/core/services/classhub_path_service.dart';
 import 'package:file_picker/file_picker.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final void Function(ThemeMode)? onThemeChanged;
+
+  const SettingsScreen({super.key, this.onThemeChanged});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -11,16 +13,21 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _currentPath = '';
+  ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void initState() {
     super.initState();
-    _loadPath();
+    _loadData();
   }
 
-  Future<void> _loadPath() async {
+  Future<void> _loadData() async {
     final path = await ClasshubPathService.getPath();
-    setState(() => _currentPath = path);
+    final theme = await ClasshubPathService.getThemeMode();
+    setState(() {
+      _currentPath = path;
+      _themeMode = theme;
+    });
   }
 
   Future<void> _changePath() async {
@@ -36,6 +43,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _changeTheme(ThemeMode mode) async {
+    debugPrint('[Settings] _changeTheme: mode=$mode');
+    await ClasshubPathService.saveThemeMode(mode);
+    setState(() => _themeMode = mode);
+    debugPrint('[Settings] calling onThemeChanged callback');
+    widget.onThemeChanged?.call(mode);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,55 +63,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: ListView(
         children: [
+          
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Theme', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                SegmentedButton<ThemeMode>(
+                  segments: const [
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.system,
+                      label: Text('System'),
+                    ),
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.light,
+                      label: Text('Light'),
+                    ),
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.dark,
+                      label: Text('Dark'),
+                    ),
+                  ],
+                  selected: {_themeMode},
+                  onSelectionChanged: (selection) {
+                    _changeTheme(selection.first);
+                  },
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
           ListTile(
-            leading: const Icon(Icons.folder),
             title: const Text('Storage location'),
-            subtitle: Text(_currentPath),
+            subtitle: Text(
+              _currentPath,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: _changePath,
           ),
           const Divider(),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('About'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const _AboutRoute()),
-              );
-            },
-          ),
         ],
       ),
     );
   }
 }
 
-class _AboutRoute extends StatelessWidget {
-  const _AboutRoute();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('About'),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.folder_copy, size: 80),
-            SizedBox(height: 24),
-            Text(
-              'ClassHub',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text('Version 1.0.0'),
-          ],
-        ),
-      ),
-    );
-  }
-}
