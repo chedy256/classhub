@@ -8,7 +8,7 @@ class LinkService {
   // ─── DEEP LINK BUILDER ───────────────────────────────────────────────────
 
   /// Construit le lien HTTPS deep link
-  /// Format: https://classhub.knisium.com/add?url=URL_ENCODEE
+  /// Format: https://classhub.knisium.com/add?url=URL1&url=URL2&url=URL3
   String buildAddSourcesDeepLinkString(List<String> urls) {
     final cleaned = urls
         .map((e) => e.trim())
@@ -19,8 +19,11 @@ class LinkService {
       throw ArgumentError('urls must not be empty');
     }
 
-    final encodedUrl = Uri.encodeComponent(cleaned.first);
-    return 'https://classhub.knisium.com/add?url=$encodedUrl';
+    // Support multiple URLs as repeated query parameters
+    final urlParams = cleaned
+        .map((u) => 'url=${Uri.encodeComponent(u)}')
+        .join('&');
+    return 'https://classhub.knisium.com/add?$urlParams';
   }
 
   // ─── SHARE & CLIPBOARD ───────────────────────────────────────────────────
@@ -50,6 +53,51 @@ class LinkService {
       return uri.queryParametersAll['url'] ?? [];
     }
     return [];
+  }
+
+  /// Extrait les URLs depuis une chaîne d'entrée
+  /// Supporte:
+  /// - URL directes (https://github.com/owner/repo)
+  /// - Liens Classhub (https://classhub.knisium.com/add?url=...)
+  /// - classhub://add?url=...
+  List<String> extractUrlsFromInput(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return [];
+
+    List<String> results = [];
+
+    // Essayer de parser comme URI
+    try {
+      final uri = Uri.parse(trimmed);
+
+      // Si c'est un lien Classhub, extraire les URLs internes
+      if (uri.host == 'classhub.knisium.com' && uri.path.startsWith('/add')) {
+        return uri.queryParametersAll['url'] ?? [];
+      }
+
+      // Si c'est un scheme custom classhub
+      if (uri.scheme == 'classhub' && uri.host == 'add') {
+        return uri.queryParametersAll['url'] ?? [];
+      }
+
+      // Sinon, vérifier si c'est une URL directe valide
+      if (uri.hasScheme && (uri.scheme == 'https' || uri.scheme == 'http')) {
+        if (uri.host.isNotEmpty) {
+          results.add(trimmed);
+        }
+      }
+    } catch (_) {}
+
+    // Fallback: si ça ressemble à une URL GitHub directe
+    if (results.isEmpty && _looksLikeGitHubUrl(trimmed)) {
+      results.add(trimmed);
+    }
+
+    return results;
+  }
+
+  bool _looksLikeGitHubUrl(String url) {
+    return url.contains('github.com/') && !url.contains(' ');
   }
 
   // ─── APP LINKS ───────────────────────────────────────────────────────────

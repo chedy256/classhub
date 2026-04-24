@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 
@@ -25,6 +26,22 @@ class FileExplorerService {
 
   bool isSyncedSource(String path) {
     return File(p.join(path, '.source', 'source.json')).existsSync();
+  }
+
+  String? getSourceUrl(String path) {
+    final sourceFile = File(p.join(path, '.source', 'source.json'));
+    if (!sourceFile.existsSync()) return null;
+    try {
+      final json = sourceFile.readAsStringSync();
+      final data = _parseJson(json);
+      return data['url'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  dynamic _parseJson(String json) {
+    return const JsonDecoder().convert(json);
   }
 
   List<Directory> getSources(String rootPath) {

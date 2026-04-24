@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:sync_engine/sync_engine.dart';
@@ -12,12 +14,20 @@ import 'settings_screen.dart';
 import 'trash_screen.dart';
 import 'support_screen.dart';
 import 'about_screen.dart';
+import 'package:classhub/share/screens/add_screen.dart';
+import 'package:classhub/share/services/deep_link_service.dart';
 
 class MainScreen extends StatefulWidget {
   final String rootPath;
   final void Function(ThemeMode)? onThemeChanged;
+  final List<String> incomingUrls;
 
-  const MainScreen({super.key, required this.rootPath, this.onThemeChanged});
+  const MainScreen({
+    super.key,
+    required this.rootPath,
+    this.onThemeChanged,
+    this.incomingUrls = const [],
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -34,6 +44,7 @@ class _MainScreenState extends State<MainScreen>
 
   final FileExplorerService _fileExplorerService = FileExplorerService();
   final TrashService _trashService = TrashService();
+  final LinkService _linkService = LinkService();
   List<FileSystemEntity> _entries = [];
 
   @override
@@ -48,6 +59,40 @@ class _MainScreenState extends State<MainScreen>
       curve: Curves.easeOut,
     );
     _loadEntries();
+    _initDeepLinks();
+  }
+
+  void _initDeepLinks() {
+    if (widget.incomingUrls.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openAddScreen(widget.incomingUrls);
+      });
+    }
+    _linkService.linkStream.listen((uri) {
+      final urls = _linkService.extractAddUrls(uri);
+      if (urls.isNotEmpty && mounted) {
+        _openAddScreen(urls);
+      }
+    });
+  }
+
+  void _openAddScreen(List<String> urls) {
+    showDialog(
+      context: context,
+      builder: (_) => AddSourceDialog(
+        incomingUrls: urls,
+        rootPath: widget.rootPath,
+        onAdded: _loadEntries,
+      ),
+    );
+  }
+
+  void _addSource() {
+    showDialog(
+      context: context,
+      builder: (_) =>
+          AddSourceDialog(rootPath: widget.rootPath, onAdded: _loadEntries),
+    );
   }
 
   @override
@@ -95,23 +140,6 @@ class _MainScreenState extends State<MainScreen>
     if (path != null) {
       _fileExplorerService.copyFolderTo(widget.rootPath, path);
       _loadEntries();
-    }
-  }
-
-  Future<void> _addSource() async {
-    _toggleFab();
-    final url = await _showTextInputDialog(
-      context,
-      'Add Source',
-      'Paste a GitHub URL',
-      'Add',
-    );
-    if (url != null && url.isNotEmpty) {
-      final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
-      final result = await syncEngine.addSource(url);
-      if (result.success) {
-        _loadEntries();
-      }
     }
   }
 
@@ -174,6 +202,29 @@ class _MainScreenState extends State<MainScreen>
     );
   }
 
+  Future<void> _shareSelected() async {
+    final toShare = _selectedIndices
+        .map((i) => _entries[i])
+        .whereType<Directory>()
+        .where((d) => _fileExplorerService.isSyncedSource(d.path))
+        .toList();
+
+    final urls = <String>[];
+    for (final dir in toShare) {
+      final url = _fileExplorerService.getSourceUrl(dir.path);
+      if (url != null) urls.add(url);
+    }
+
+    if (urls.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Aucun source sélectionné')));
+      return;
+    }
+
+    await _linkService.shareSheet(urls);
+  }
+
   void _showItemMenu(FileSystemEntity entity) {
     _showEntityMenu(context, entity, _fileExplorerService, _loadEntries);
   }
@@ -185,7 +236,7 @@ class _MainScreenState extends State<MainScreen>
         builder: (_) => SearchScreen(rootPath: widget.rootPath),
       ),
     );
-if (!mounted || selectedPath == null) return;
+    if (!mounted || selectedPath == null) return;
     final type = FileSystemEntity.typeSync(selectedPath);
     if (type == FileSystemEntityType.directory) {
       await Navigator.push(
@@ -231,9 +282,8 @@ if (!mounted || selectedPath == null) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => SettingsScreen(
-                        onThemeChanged: widget.onThemeChanged,
-                      ),
+                      builder: (_) =>
+                          SettingsScreen(onThemeChanged: widget.onThemeChanged),
                     ),
                   );
                 },
@@ -329,12 +379,28 @@ if (!mounted || selectedPath == null) return;
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: ElevatedButton.icon(
-                  onPressed: _selectedIndices.isEmpty
-                      ? null
-                      : _deleteSelected,
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Move to trash'),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _selectedIndices.isEmpty
+                            ? null
+                            : _shareSelected,
+                        icon: const Icon(Icons.share),
+                        label: const Text('Share'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _selectedIndices.isEmpty
+                            ? null
+                            : _deleteSelected,
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Move to trash'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             )
@@ -384,7 +450,8 @@ if (!mounted || selectedPath == null) return;
                                     builder: (_) => _InsideFolderScreen(
                                       folderPath: entity.path,
                                       rootPath: widget.rootPath,
-                                      isSynced: _fileExplorerService.isSyncedSource(entity.path),
+                                      isSynced: _fileExplorerService
+                                          .isSyncedSource(entity.path),
                                     ),
                                   ),
                                 );
@@ -435,17 +502,21 @@ if (!mounted || selectedPath == null) return;
                                   children: [
                                     Text(
                                       name,
-                                      style: theme.textTheme.bodyLarge?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                      style: theme.textTheme.bodyLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      _fileExplorerService.entitySubtitle(entity),
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
+                                      _fileExplorerService.entitySubtitle(
+                                        entity,
                                       ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -700,9 +771,7 @@ class _RegularFab extends StatelessWidget {
             height: isFabExpanded ? 52 : 56,
             decoration: BoxDecoration(
               color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(
-                isFabExpanded ? 26 : 16,
-              ),
+              borderRadius: BorderRadius.circular(isFabExpanded ? 26 : 16),
             ),
             child: AnimatedRotation(
               turns: isFabExpanded ? 0.125 : 0,
@@ -815,7 +884,9 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted'),
+          content: Text(
+            'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -827,6 +898,61 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
           backgroundColor: Colors.red,
         ),
       );
+    }
+
+    void _showPropertiesDialog(
+      BuildContext context,
+      FileSystemEntity entity,
+    ) async {
+      final sourceDir = Directory(entity.path);
+      final store = SourceStore();
+
+      try {
+        final config = await store.read(sourceDir);
+        final json = config.toJson();
+
+        final content = json.entries
+            .map((e) => '${e.key}: ${e.value ?? "-"}')
+            .join('\n');
+
+        if (!context.mounted) return;
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Properties'),
+            content: SingleChildScrollView(
+              child: Text(
+                content,
+                style: const TextStyle(fontFamily: 'monospace'),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  final jsonStr = const JsonEncoder.withIndent(
+                    '  ',
+                  ).convert(json);
+                  Clipboard.setData(ClipboardData(text: jsonStr));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Copied to clipboard')),
+                  );
+                },
+                child: const Text('Copy JSON'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -902,11 +1028,13 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(_isSelecting ? Icons.close : Icons.arrow_back),
-          onPressed:
-              _isSelecting ? _cancelSelection : () => Navigator.pop(context),
+          onPressed: _isSelecting
+              ? _cancelSelection
+              : () => Navigator.pop(context),
         ),
-        title:
-            _isSelecting ? Text('${_selectedIndices.length} selected') : Text(p.basename(widget.folderPath)),
+        title: _isSelecting
+            ? Text('${_selectedIndices.length} selected')
+            : Text(p.basename(widget.folderPath)),
         actions: _isSelecting
             ? [
                 IconButton(
@@ -925,8 +1053,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: ElevatedButton.icon(
-                  onPressed:
-                      _selectedIndices.isEmpty ? null : _deleteSelected,
+                  onPressed: _selectedIndices.isEmpty ? null : _deleteSelected,
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('Move to trash'),
                 ),
@@ -963,13 +1090,18 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                     final entity = _files[index];
                     final isDir = entity is Directory;
                     final name = p.basename(entity.path);
-                    final info = FileTypeInfo.classify(name, isDirectory: isDir);
+                    final info = FileTypeInfo.classify(
+                      name,
+                      isDirectory: isDir,
+                    );
                     final isSelected = _selectedIndices.contains(index);
 
                     String sizeStr = '';
                     if (entity is File) {
                       try {
-                        sizeStr = _fileExplorerService.formatSize(entity.lengthSync());
+                        sizeStr = _fileExplorerService.formatSize(
+                          entity.lengthSync(),
+                        );
                       } catch (_) {}
                     }
 
@@ -1022,7 +1154,10 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                   color: colorScheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: Icon(info.icon, color: colorScheme.onPrimaryContainer),
+                                child: Icon(
+                                  info.icon,
+                                  color: colorScheme.onPrimaryContainer,
+                                ),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -1031,21 +1166,25 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                   children: [
                                     Text(
                                       name,
-                                      style: theme.textTheme.bodyLarge?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                      style: theme.textTheme.bodyLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       isDir
-                                          ? _fileExplorerService.entitySubtitle(entity)
+                                          ? _fileExplorerService.entitySubtitle(
+                                              entity,
+                                            )
                                           : sizeStr.isNotEmpty
-                                              ? '${info.label} · $sizeStr'
-                                              : info.label,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
+                                          ? '${info.label} · $sizeStr'
+                                          : info.label,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -1067,10 +1206,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               right: 16,
               bottom: 40,
               child: widget.isSynced
-                  ? _SyncedFab(
-                      isSyncing: _isSyncing,
-                      onSync: _syncSource,
-                    )
+                  ? _SyncedFab(isSyncing: _isSyncing, onSync: _syncSource)
                   : _RegularFab(
                       isFabExpanded: _isFabExpanded,
                       fabAnimController: _fabAnimController,
@@ -1101,9 +1237,7 @@ Future<String?> _showTextInputDialog(
       content: TextField(
         controller: controller,
         autofocus: true,
-        decoration: InputDecoration(
-          hintText: hint,
-        ),
+        decoration: InputDecoration(hintText: hint),
       ),
       actions: [
         TextButton(
@@ -1125,6 +1259,10 @@ void _showEntityMenu(
   FileExplorerService service,
   VoidCallback onRefresh,
 ) {
+  final isSource = entity is Directory && service.isSyncedSource(entity.path);
+  final linkService = LinkService();
+  final sourceUrl = isSource ? service.getSourceUrl(entity.path) : null;
+
   showModalBottomSheet(
     context: context,
     builder: (ctx) => SafeArea(
@@ -1149,14 +1287,76 @@ void _showEntityMenu(
               }
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.share_outlined),
-            title: const Text('Share source'),
-            onTap: () {
-            },
-          ),
+          if (sourceUrl != null)
+            ListTile(
+              leading: const Icon(Icons.share),
+              title: const Text('Share'),
+              onTap: () {
+                Navigator.pop(ctx);
+                linkService.shareSheet([sourceUrl]);
+              },
+            ),
+          if (isSource)
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('Properties'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showPropertiesDialog(context, entity);
+              },
+            ),
         ],
       ),
     ),
   );
+}
+
+void _showPropertiesDialog(
+  BuildContext context,
+  FileSystemEntity entity,
+) async {
+  final sourceDir = Directory(entity.path);
+  final store = SourceStore();
+
+  try {
+    final config = await store.read(sourceDir);
+    final json = config.toJson();
+
+    final content = json.entries
+        .map((e) => '${e.key}: ${e.value ?? "-"}')
+        .join('\n');
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Properties'),
+        content: SingleChildScrollView(
+          child: Text(content, style: const TextStyle(fontFamily: 'monospace')),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              final jsonStr = const JsonEncoder.withIndent('  ').convert(json);
+              Clipboard.setData(ClipboardData(text: jsonStr));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copied to clipboard')),
+              );
+            },
+            child: const Text('Copy JSON'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Error: $e')));
+  }
 }

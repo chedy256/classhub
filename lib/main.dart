@@ -1,10 +1,12 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:classhub/core/theme/app_theme.dart';
 import 'package:classhub/onboarding/screens/landing_page1.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
 import 'package:classhub/core/services/classhub_path_service.dart';
+import 'package:classhub/share/services/deep_link_service.dart';
 
 import 'package:classhub/file_explorer/screens/main_screen.dart';
 
@@ -17,11 +19,18 @@ void main() async {
   final hasPermission = await StoragePermissionService.hasPermission();
   final pathExists = await Directory(savedPath).exists();
 
+  final linkService = LinkService();
+  final initialUri = await linkService.getInitialLink();
+  final List<String> incomingUrls = initialUri != null
+      ? linkService.extractAddUrls(initialUri)
+      : <String>[];
+
   runApp(
     ClasshubApp(
       isSetupComplete: hasPermission && pathExists,
       rootPath: savedPath,
       initialThemeMode: savedThemeMode,
+      incomingUrls: incomingUrls,
     ),
   );
 }
@@ -30,12 +39,13 @@ class ClasshubApp extends StatefulWidget {
   final bool isSetupComplete;
   final String rootPath;
   final ThemeMode initialThemeMode;
-
+  final List<String> incomingUrls;
   const ClasshubApp({
     super.key,
     required this.isSetupComplete,
     required this.rootPath,
     required this.initialThemeMode,
+    this.incomingUrls = const [],
   });
 
   @override
@@ -55,7 +65,9 @@ class _ClasshubAppState extends State<ClasshubApp> {
   void updateTheme(ThemeMode mode) {
     debugPrint('[ClasshubApp] updateTheme called: mode=$mode');
     setState(() {
-      debugPrint('[ClasshubApp] setState updating _themeMode from $_themeMode to $mode');
+      debugPrint(
+        '[ClasshubApp] setState updating _themeMode from $_themeMode to $mode',
+      );
       _themeMode = mode;
     });
   }
@@ -63,17 +75,27 @@ class _ClasshubAppState extends State<ClasshubApp> {
   @override
   Widget build(BuildContext context) {
     debugPrint('[ClasshubApp] build: _themeMode=$_themeMode');
-    
+
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         final bool isDark = _themeMode == ThemeMode.dark;
         final bool isLight = _themeMode == ThemeMode.light;
-        final scheme = isDark 
-            ? (darkDynamic ?? ColorScheme.fromSeed(seedColor: const Color(0xFF5C6BC0), brightness: Brightness.dark))
-            : (lightDynamic ?? ColorScheme.fromSeed(seedColor: const Color(0xFF5C6BC0), brightness: Brightness.light));
-        
-        debugPrint('[ClasshubApp] isDark=$isDark, isLight=$isLight, scheme brightness=${scheme.brightness}');
-        
+        final scheme = isDark
+            ? (darkDynamic ??
+                  ColorScheme.fromSeed(
+                    seedColor: const Color(0xFF5C6BC0),
+                    brightness: Brightness.dark,
+                  ))
+            : (lightDynamic ??
+                  ColorScheme.fromSeed(
+                    seedColor: const Color(0xFF5C6BC0),
+                    brightness: Brightness.light,
+                  ));
+
+        debugPrint(
+          '[ClasshubApp] isDark=$isDark, isLight=$isLight, scheme brightness=${scheme.brightness}',
+        );
+
         return MaterialApp(
           title: 'ClassHub',
           debugShowCheckedModeBanner: false,
@@ -81,7 +103,11 @@ class _ClasshubAppState extends State<ClasshubApp> {
           darkTheme: AppTheme.build(darkDynamic, Brightness.dark),
           themeMode: _themeMode,
           home: widget.isSetupComplete
-              ? MainScreen(rootPath: widget.rootPath, onThemeChanged: updateTheme)
+              ? MainScreen(
+                  rootPath: widget.rootPath,
+                  onThemeChanged: updateTheme,
+                  incomingUrls: widget.incomingUrls,
+                )
               : const LandingPage1(),
         );
       },
