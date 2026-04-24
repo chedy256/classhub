@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'dart:io';
 import 'package:classhub/share/services/deep_link_service.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -24,22 +23,12 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
   final _urlController = TextEditingController();
   List<String> _urls = [];
   Set<int> _selected = {};
-  bool _isLoading = false;
-  String? _loadingMessage;
 
   @override
   void initState() {
     super.initState();
     _urls = List.from(widget.incomingUrls);
     _selected = Set.from(List.generate(_urls.length, (i) => i));
-    // If direct URLs (not Classhub), add them directly
-    if (_urls.isNotEmpty &&
-        !_isClasshubUrl(_urls.first) &&
-        widget.rootPath != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _addSelected();
-      });
-    }
   }
 
   @override
@@ -57,13 +46,11 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
     }
   }
 
-  void _addUrlFromInput() {
+  void _handleUrlInput() {
     final input = _urlController.text.trim();
     if (input.isEmpty) return;
 
-    final isClasshub = _isClasshubUrl(input);
-
-    if (isClasshub) {
+    if (_isClasshubUrl(input)) {
       final extracted = _linkService.extractUrlsFromInput(input);
       if (extracted.isEmpty) {
         _showSnack('URL invalide');
@@ -73,39 +60,64 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
         _urls = extracted;
         _selected = Set.from(List.generate(_urls.length, (i) => i));
       });
-      _urlController.clear();
     } else {
       _addUrlDirectly(input);
     }
   }
 
-  Future<void> _addUrlDirectly(String url) async {
+  void _addUrlDirectly(String url) {
     if (widget.rootPath == null) {
-      _showSnack('Chemin racine non disponible');
+      _showSnack('No root path available');
       return;
     }
+    _addSourcesInBackground([url]);
+  }
 
-    setState(() {
-      _isLoading = true;
-      _loadingMessage = 'Ajout en cours...';
+  void _addSourcesInBackground(List<String> urlsToAdd) {
+    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath!));
+
+    _showSnack('Adding ${urlsToAdd.length} source(s)...', duration: const Duration(seconds: 30));
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _closeDialog();
     });
 
-    try {
-      final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath!));
-      final result = await syncEngine.addSource(url);
+    Future(() async {
+      int success = 0;
+      final errors = <String>[];
 
-      if (result.success) {
-        _showSnack('Source ajoutee');
-        widget.onAdded?.call();
-        if (mounted) Navigator.pop(context);
-      } else {
-        _showSnack('Erreur: ${result.error}');
-        setState(() => _isLoading = false);
+      for (var i = 0; i < urlsToAdd.length; i++) {
+        if (!mounted) return;
+
+        _showSnack(
+          'Adding ${i + 1}/${urlsToAdd.length}...',
+          duration: const Duration(seconds: 30),
+        );
+
+        try {
+          final result = await syncEngine.addSource(urlsToAdd[i]);
+          if (result.success) {
+            success++;
+          } else {
+            errors.add('${_getRepoName(urlsToAdd[i])}: ${result.error}');
+          }
+        } catch (e) {
+          errors.add('${_getRepoName(urlsToAdd[i])}: $e');
+        }
       }
-    } catch (e) {
-      _showSnack('Erreur: $e');
-      setState(() => _isLoading = false);
-    }
+
+      if (!mounted) return;
+
+      widget.onAdded?.call();
+
+      if (success == urlsToAdd.length) {
+        _showSnack('$success source(s) added');
+      } else if (success > 0) {
+        _showSnack('$success added, ${errors.length} failed');
+      } else {
+        _showSnack('Error: ${errors.first}');
+      }
+    });
   }
 
   void _toggleSelect(int index) {
@@ -118,53 +130,19 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
     });
   }
 
-  Future<void> _addSelected() async {
+  void _confirmSelected() {
     if (_selected.isEmpty) {
-      _showSnack('Selectionnez au moins une URL');
-      return;
-    }
-    if (widget.rootPath == null) {
-      _showSnack('Chemin racine non disponible');
+      _showSnack('Select at least one source');
       return;
     }
 
     final urlsToAdd = _selected.map((i) => _urls[i]).toList();
-    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath!));
+    _addSourcesInBackground(urlsToAdd);
+  }
 
-    setState(() => _isLoading = true);
-
-    int success = 0;
-    final errors = <String>[];
-
-    for (var i = 0; i < urlsToAdd.length; i++) {
-      setState(() {
-        _loadingMessage = 'Ajout de ${i + 1}/${urlsToAdd.length}...';
-      });
-
-      try {
-        final result = await syncEngine.addSource(urlsToAdd[i]);
-        if (result.success) {
-          success++;
-        } else {
-          errors.add('${_getRepoName(urlsToAdd[i])}: ${result.error}');
-        }
-      } catch (e) {
-        errors.add('${_getRepoName(urlsToAdd[i])}: $e');
-      }
-    }
-
-    setState(() => _isLoading = false);
-
-    if (success == urlsToAdd.length) {
-      _showSnack('$success source(s) ajoutee(s)');
-      widget.onAdded?.call();
-      if (mounted) Navigator.pop(context);
-    } else if (success > 0) {
-      _showSnack('$success ajoutee, ${errors.length} echouee(s)');
-      widget.onAdded?.call();
-      if (mounted) Navigator.pop(context);
-    } else {
-      _showSnack('Erreur: ${errors.first}');
+  void _closeDialog() {
+    if (mounted) {
+      Navigator.pop(context);
     }
   }
 
@@ -179,65 +157,41 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
     return url;
   }
 
-  void _showSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  void _showSnack(String message, {Duration? duration}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: duration ?? const Duration(seconds: 3),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isSelecting = _urls.isNotEmpty;
     return AlertDialog(
-      title: const Text('Add Source'),
+      title: Text(isSelecting ? 'Select Sources' : 'Add Source'),
       content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.9,
+        width: MediaQuery.of(context).size.width * 0.85,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _urlController,
-                    decoration: const InputDecoration(
-                      hintText: 'https://github.com/...',
-                      prefixIcon: Icon(Icons.link),
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.url,
-                    enabled: !_isLoading,
-                    onSubmitted: (_) => _addUrlFromInput(),
-                  ),
+            if (!isSelecting)
+              TextField(
+                controller: _urlController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'https://github.com/...',
+                  prefixIcon: Icon(Icons.link),
                 ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  icon: const Icon(Icons.add),
-                  onPressed: _isLoading ? null : _addUrlFromInput,
-                ),
-              ],
-            ),
-            if (_isLoading) ...[
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(_loadingMessage ?? 'Ajout...'),
-                ],
-              ),
-            ],
-            if (_urls.isNotEmpty && !_isLoading) ...[
-              const SizedBox(height: 16),
+                keyboardType: TextInputType.url,
+                onSubmitted: (_) => _handleUrlInput(),
+              )
+            else ...[
               ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.3,
+                  maxHeight: MediaQuery.of(context).size.height * 0.25,
                 ),
                 child: ListView.builder(
                   shrinkWrap: true,
@@ -258,24 +212,23 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
                 ),
               ),
               const SizedBox(height: 8),
-              FilledButton(
-                onPressed: _selected.isEmpty ? null : _addSelected,
-                child: Text(
-                  _selected.isEmpty
-                      ? 'Selectionner'
-                      : 'Ajouter (${_selected.length})',
-                ),
+              Text(
+                '${_selected.length} source(s) selected',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ],
         ),
       ),
       actions: [
-        if (!_isLoading)
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: isSelecting ? _confirmSelected : _handleUrlInput,
+          child: Text(isSelecting ? 'Confirm' : 'Add'),
+        ),
       ],
     );
   }

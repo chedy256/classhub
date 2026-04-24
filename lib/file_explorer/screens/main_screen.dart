@@ -20,13 +20,11 @@ import 'package:classhub/share/services/deep_link_service.dart';
 class MainScreen extends StatefulWidget {
   final String rootPath;
   final void Function(ThemeMode)? onThemeChanged;
-  final List<String> incomingUrls;
 
   const MainScreen({
     super.key,
     required this.rootPath,
     this.onThemeChanged,
-    this.incomingUrls = const [],
   });
 
   @override
@@ -63,11 +61,6 @@ class _MainScreenState extends State<MainScreen>
   }
 
   void _initDeepLinks() {
-    if (widget.incomingUrls.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _openAddScreen(widget.incomingUrls);
-      });
-    }
     _linkService.linkStream.listen((uri) {
       final urls = _linkService.extractAddUrls(uri);
       if (urls.isNotEmpty && mounted) {
