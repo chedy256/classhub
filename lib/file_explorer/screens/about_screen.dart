@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
@@ -18,11 +18,6 @@ class AboutScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Icon(
-            Icons.folder_copy,
-            size: 80,
-            color: theme.colorScheme.primary,
-          ),
           const SizedBox(height: 24),
           Text(
             'ClassHub',
@@ -40,13 +35,21 @@ class AboutScreen extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-          Text(
-            'Sync files from GitHub, Google Classroom, and more to your device.',
-            style: theme.textTheme.bodyLarge,
-            textAlign: TextAlign.center,
+          ListTile(
+            leading: const Icon(Icons.code),
+            title: const Text('Source code'),
+            subtitle: const Text('GitHub repository'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => _openUrl('https://github.com/titanknis/classhub'),
           ),
         ],
       ),
     );
+  }
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 }
