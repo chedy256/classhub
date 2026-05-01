@@ -16,12 +16,12 @@ void main() async {
   final savedThemeModeIndex = await ClasshubStorageService.getThemeModeIndex();
   final savedThemeMode = ThemeMode.values[savedThemeModeIndex];
   final hasPermission = await StoragePermissionService.hasPermission();
-  final pathExists = await Directory(savedPath).exists();
+  final pathExists = savedPath != null && await Directory(savedPath).exists();
 
   runApp(
     ClasshubApp(
       isSetupComplete: hasPermission && pathExists,
-      rootPath: savedPath,
+      rootPath: savedPath ?? '',
       initialThemeMode: savedThemeMode,
     ),
   );
