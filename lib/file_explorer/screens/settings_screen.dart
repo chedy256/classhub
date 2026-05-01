@@ -1,5 +1,6 @@
+import 'package:classhub/core/services/classhub_storage_service.dart';
 import 'package:flutter/material.dart';
-import 'package:classhub/core/services/classhub_path_service.dart';
+import 'package:classhub/core/services/classhub_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -22,8 +23,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadData() async {
-    final path = await ClasshubPathService.getPath();
-    final theme = await ClasshubPathService.getThemeMode();
+    final path = await ClasshubStorageService.getPath();
+    final theme = await ClasshubStorageService.getThemeMode();
     setState(() {
       _currentPath = path;
       _themeMode = theme;
@@ -33,19 +34,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _changePath() async {
     final path = await FilePicker.getDirectoryPath();
     if (path != null) {
-      await ClasshubPathService.savePath(path);
+      await ClasshubStorageService.savePath(path);
       setState(() => _currentPath = path);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Storage path updated')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Storage path updated')));
       }
     }
   }
 
   Future<void> _changeTheme(ThemeMode mode) async {
     debugPrint('[Settings] _changeTheme: mode=$mode');
-    await ClasshubPathService.saveThemeMode(mode);
+    await ClasshubStorageService.saveThemeMode(mode);
     setState(() => _themeMode = mode);
     debugPrint('[Settings] calling onThemeChanged callback');
     widget.onThemeChanged?.call(mode);
@@ -63,13 +64,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: ListView(
         children: [
-          
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Theme', style: TextStyle(fontWeight: FontWeight.w600)),
+                const Text(
+                  'Theme',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 12),
                 SegmentedButton<ThemeMode>(
                   segments: const [
@@ -113,4 +116,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-

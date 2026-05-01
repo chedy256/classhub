@@ -5,15 +5,15 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:classhub/core/theme/app_theme.dart';
 import 'package:classhub/onboarding/screens/landing_page1.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
-import 'package:classhub/core/services/classhub_path_service.dart';
+import 'package:classhub/core/services/classhub_storage_service.dart';
 
 import 'package:classhub/file_explorer/screens/main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final savedPath = await ClasshubPathService.getPath();
-  final savedThemeModeIndex = await ClasshubPathService.getThemeModeIndex();
+  final savedPath = await ClasshubStorageService.getPath();
+  final savedThemeModeIndex = await ClasshubStorageService.getThemeModeIndex();
   final savedThemeMode = ThemeMode.values[savedThemeModeIndex];
   final hasPermission = await StoragePermissionService.hasPermission();
   final pathExists = await Directory(savedPath).exists();

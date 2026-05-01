@@ -1,14 +1,14 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'package:classhub/core/services/classhub_path_service.dart';
+import 'package:classhub/core/services/classhub_storage_service.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
 
 class OnboardingService {
   /// Returns the previously saved path, or null if none is stored.
   static Future<String?> loadSavedPath() async {
-    final hasCustomPath = await ClasshubPathService.hasCustomPath();
+    final hasCustomPath = await ClasshubStorageService.hasCustomPath();
     if (!hasCustomPath) return null;
-    return ClasshubPathService.getPath();
+    return ClasshubStorageService.getPath();
   }
 
   /// Requests storage permission and opens the folder picker.
@@ -23,7 +23,7 @@ class OnboardingService {
     );
 
     if (selectedPath != null) {
-      await ClasshubPathService.savePath(selectedPath);
+      await ClasshubStorageService.savePath(selectedPath);
     }
 
     return {'hasPermission': true, 'path': selectedPath};

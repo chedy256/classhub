@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ClasshubPathService {
+class ClasshubStorageService {
   static const String _pathKey = 'classhub_root_path';
   static const String _themeKey = 'classhub_theme_mode';
 
   static Future<String> getPath() async {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString(_pathKey) ?? '';
-    if (path.isEmpty) return '/storage/emulated/0';
+    if (path.isEmpty) return null;
     return path;
   }
 
