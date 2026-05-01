@@ -112,6 +112,19 @@ class FileExplorerService {
     return 0;
   }
 
+  Future<int> getFolderSize(String folderPath) async {
+    final dir = Directory(folderPath);
+    if (!dir.existsSync()) return 0;
+
+    int total = 0;
+    await for (final entity in dir.list(recursive: true)) {
+      if (entity is File) {
+        total += entity.lengthSync();
+      }
+    }
+    return total;
+  }
+
   String formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) {

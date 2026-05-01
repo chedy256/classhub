@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:sync_engine/sync_engine.dart';
@@ -44,6 +42,7 @@ class _MainScreenState extends State<MainScreen>
   final TrashService _trashService = TrashService();
   final LinkService _linkService = LinkService();
   List<FileSystemEntity> _entries = [];
+  final Map<int, int?> _folderSizes = {};
 
   @override
   void initState() {
@@ -98,8 +97,20 @@ class _MainScreenState extends State<MainScreen>
     setState(() {
       _entries = _fileExplorerService.loadEntries(widget.rootPath);
       _selectedIndices.clear();
+      _folderSizes.clear();
       if (_entries.isEmpty) _isSelecting = false;
     });
+    _loadFolderSizes();
+  }
+
+  void _loadFolderSizes() {
+    for (int i = 0; i < _entries.length; i++) {
+      if (_entries[i] is Directory) {
+        _fileExplorerService.getFolderSize(_entries[i].path).then((size) {
+          if (mounted) setState(() => _folderSizes[i] = size);
+        });
+      }
+    }
   }
 
   void _toggleFab() {
@@ -494,9 +505,7 @@ class _MainScreenState extends State<MainScreen>
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      _fileExplorerService.entitySubtitle(
-                                        entity,
-                                      ),
+                                      '${_fileExplorerService.entitySubtitle(entity)}${isDir && _folderSizes[index] != null ? ' · ${_fileExplorerService.formatSize(_folderSizes[index]!)}' : ''}',
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
@@ -797,6 +806,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
   bool _isSelecting = false;
   bool _isSyncing = false;
   bool _isFabExpanded = false;
+  final Map<int, int?> _folderSizes = {};
   late AnimationController _fabAnimController;
   late Animation<double> _fabAnimation;
 
@@ -824,8 +834,20 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     setState(() {
       _files = _fileExplorerService.loadFolderContents(widget.folderPath);
       _selectedIndices.clear();
+      _folderSizes.clear();
       if (_files.isEmpty) _isSelecting = false;
     });
+    _loadFolderSizes();
+  }
+
+  void _loadFolderSizes() {
+    for (int i = 0; i < _files.length; i++) {
+      if (_files[i] is Directory) {
+        _fileExplorerService.getFolderSize(_files[i].path).then((size) {
+          if (mounted) setState(() => _folderSizes[i] = size);
+        });
+      }
+    }
   }
 
   void _toggleFab() {
@@ -882,61 +904,6 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
           backgroundColor: Colors.red,
         ),
       );
-    }
-
-    void _showPropertiesDialog(
-      BuildContext context,
-      FileSystemEntity entity,
-    ) async {
-      final sourceDir = Directory(entity.path);
-      final store = SourceStore();
-
-      try {
-        final config = await store.read(sourceDir);
-        final json = config.toJson();
-
-        final content = json.entries
-            .map((e) => '${e.key}: ${e.value ?? "-"}')
-            .join('\n');
-
-        if (!context.mounted) return;
-
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Properties'),
-            content: SingleChildScrollView(
-              child: Text(
-                content,
-                style: const TextStyle(fontFamily: 'monospace'),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  final jsonStr = const JsonEncoder.withIndent(
-                    '  ',
-                  ).convert(json);
-                  Clipboard.setData(ClipboardData(text: jsonStr));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied to clipboard')),
-                  );
-                },
-                child: const Text('Copy JSON'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        );
-      } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     }
   }
 
@@ -1159,9 +1126,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                     const SizedBox(height: 4),
                                     Text(
                                       isDir
-                                          ? _fileExplorerService.entitySubtitle(
-                                              entity,
-                                            )
+                                          ? '${_fileExplorerService.entitySubtitle(entity)}${_folderSizes[index] != null ? ' · ${_fileExplorerService.formatSize(_folderSizes[index]!)}' : ''}'
                                           : sizeStr.isNotEmpty
                                           ? '${info.label} · $sizeStr'
                                           : info.label,
@@ -1280,15 +1245,14 @@ void _showEntityMenu(
                 linkService.shareSheet([sourceUrl]);
               },
             ),
-          if (isSource)
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('Properties'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showPropertiesDialog(context, entity);
-              },
-            ),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Properties'),
+            onTap: () {
+              Navigator.pop(ctx);
+              _showPropertiesDialog(context, entity, service);
+            },
+          ),
         ],
       ),
     ),
@@ -1298,49 +1262,154 @@ void _showEntityMenu(
 void _showPropertiesDialog(
   BuildContext context,
   FileSystemEntity entity,
-) async {
-  final sourceDir = Directory(entity.path);
-  final store = SourceStore();
+  FileExplorerService service,
+) {
+  showDialog(
+    context: context,
+    builder: (ctx) => _PropertiesDialog(entity: entity, service: service),
+  );
+}
 
-  try {
-    final config = await store.read(sourceDir);
-    final json = config.toJson();
+class _PropertiesDialog extends StatefulWidget {
+  final FileSystemEntity entity;
+  final FileExplorerService service;
 
-    final content = json.entries
-        .map((e) => '${e.key}: ${e.value ?? "-"}')
-        .join('\n');
+  const _PropertiesDialog({
+    required this.entity,
+    required this.service,
+  });
 
-    if (!context.mounted) return;
+  @override
+  State<_PropertiesDialog> createState() => _PropertiesDialogState();
+}
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Properties'),
-        content: SingleChildScrollView(
-          child: Text(content, style: const TextStyle(fontFamily: 'monospace')),
+class _PropertiesDialogState extends State<_PropertiesDialog> {
+  int? _size;
+  Map<String, dynamic>? _config;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSize();
+    if (widget.entity is Directory &&
+        widget.service.isSyncedSource(widget.entity.path)) {
+      _loadConfig();
+    }
+  }
+
+  Future<void> _loadSize() async {
+    final size = widget.entity is Directory
+        ? await widget.service.getFolderSize(widget.entity.path)
+        : (widget.entity as File).lengthSync();
+    if (mounted) setState(() => _size = size);
+  }
+
+  Future<void> _loadConfig() async {
+    try {
+      final store = SourceStore();
+      final config = await store.read(Directory(widget.entity.path));
+      if (mounted) setState(() => _config = config.toJson());
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDir = widget.entity is Directory;
+    final name = p.basename(widget.entity.path);
+    final stat = widget.entity.statSync();
+    final modified = stat.modified;
+
+    final rows = <Widget>[
+      _propRow('Name', name),
+      _propRow('Type', isDir ? 'Folder' : FileTypeInfo.classify(name).label),
+      _propRow(
+        'Size',
+        _size == null ? '...' : widget.service.formatSize(_size!),
+      ),
+      _propRow('Location', widget.entity.path),
+      _propRow(
+        'Modified',
+        '${modified.year}-${modified.month.toString().padLeft(2, '0')}-${modified.day.toString().padLeft(2, '0')} ${modified.hour.toString().padLeft(2, '0')}:${modified.minute.toString().padLeft(2, '0')}',
+      ),
+    ];
+
+    return AlertDialog(
+      title: const Text('Properties'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...rows,
+            if (_config != null) ...[
+              const Divider(height: 24),
+              _propRow('Type', _config!['type']?.toString() ?? '-'),
+              _propRow('URL', _config!['url']?.toString() ?? '-'),
+              _propRow(
+                'Branch',
+                _config!['default_branch']?.toString() ?? '-',
+              ),
+              _propRow(
+                'Status',
+                _config!['sync_status']?.toString() ?? '-',
+              ),
+              _propRow(
+                'Checkpoint',
+                _config!['checkpoint']?.toString() ?? '-',
+              ),
+              if (_config!['last_synced_at'] != null)
+                _propRow(
+                  'Last Synced',
+                  _formatIsoDate(_config!['last_synced_at'] as String),
+                ),
+            ],
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              final jsonStr = const JsonEncoder.withIndent('  ').convert(json);
-              Clipboard.setData(ClipboardData(text: jsonStr));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Copied to clipboard')),
-              );
-            },
-            child: const Text('Copy JSON'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  Widget _propRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
-  } catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Error: $e')));
+  }
+
+  String _formatIsoDate(String isoDate) {
+    try {
+      final dt = DateTime.parse(isoDate).toLocal();
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return isoDate;
+    }
   }
 }
