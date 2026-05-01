@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:classhub/core/services/classhub_storage_service.dart';
+import 'package:classhub/core/services/storage_permission_service.dart';
 import 'package:classhub/onboarding/services/onboarding_service.dart';
 import 'package:classhub/file_explorer/screens/main_screen.dart';
 
@@ -28,6 +30,7 @@ class FolderSelectionWrapper extends StatefulWidget {
 class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
   String? _selectedPath;
   bool _isLoading = false;
+  bool _isCompleting = false;
   String? _error;
 
   @override
@@ -37,22 +40,20 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
   }
 
   Future<void> _loadSaved() async {
-    final saved = await OnboardingService.loadSavedPath();
-    if (saved != null && mounted) setState(() => _selectedPath = saved);
+    final saved = await ClasshubStorageService.getPath();
+    if (saved != null && mounted) {
+      setState(() => _selectedPath = saved);
+    } else {
+      setState(() => _selectedPath = ClasshubStorageService.getDefaultPath());
+    }
   }
 
   Future<void> _pickFolder() async {
     setState(() { _isLoading = true; _error = null; });
 
-    final result = await OnboardingService.pickFolder();
+    final path = await OnboardingService.pickFolder();
     if (!mounted) return;
 
-    if (result['hasPermission'] != true) {
-      setState(() { _isLoading = false; _error = 'Storage permission denied.'; });
-      return;
-    }
-
-    final path = result['path'] as String?;
     if (path == null) {
       setState(() => _isLoading = false);
       return;
@@ -66,6 +67,24 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
       _isLoading = false;
       if (!valid) _error = 'Selected path does not exist.';
     });
+  }
+
+  Future<void> _completeSetup() async {
+    setState(() { _isCompleting = true; _error = null; });
+
+    final hasPermission = await StoragePermissionService.requestPermission();
+    if (!hasPermission) {
+      setState(() {
+        _isCompleting = false;
+        _error = 'Storage permission is required.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
+    ClasshubStorageService.savePath(_selectedPath!);
+    widget.onComplete(_selectedPath!);
   }
 
   @override
@@ -132,8 +151,13 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: hasFolder ? () => widget.onComplete(_selectedPath!) : null,
-                child: const Text('Finish'),
+                onPressed: hasFolder && !_isCompleting ? () => _completeSetup() : null,
+                child: _isCompleting
+                    ? const SizedBox(
+                        height: 18, width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Finish'),
               ),
             ),
           ],

@@ -1,6 +1,5 @@
 import 'package:classhub/core/services/classhub_storage_service.dart';
 import 'package:flutter/material.dart';
-import 'package:classhub/core/services/classhub_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -26,7 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final path = await ClasshubStorageService.getPath();
     final theme = await ClasshubStorageService.getThemeMode();
     setState(() {
-      _currentPath = path;
+      _currentPath = path ?? '';
       _themeMode = theme;
     });
   }
