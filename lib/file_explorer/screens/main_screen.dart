@@ -248,7 +248,10 @@ class _MainScreenState extends State<MainScreen>
           builder: (_) => _InsideFolderScreen(
             folderPath: selectedPath,
             rootPath: widget.rootPath,
-            isSynced: _fileExplorerService.isSyncedSource(selectedPath),
+            isInsideSource: _fileExplorerService.isInsideSource(
+              selectedPath,
+              widget.rootPath,
+            ),
           ),
         ),
       );
@@ -446,8 +449,11 @@ class _MainScreenState extends State<MainScreen>
                                     builder: (_) => _InsideFolderScreen(
                                       folderPath: entity.path,
                                       rootPath: widget.rootPath,
-                                      isSynced: _fileExplorerService
-                                          .isSyncedSource(entity.path),
+                                      isInsideSource: _fileExplorerService
+                                          .isInsideSource(
+                                            entity.path,
+                                            widget.rootPath,
+                                          ),
                                     ),
                                   ),
                                 );
@@ -787,12 +793,12 @@ class _RegularFab extends StatelessWidget {
 class _InsideFolderScreen extends StatefulWidget {
   final String folderPath;
   final String rootPath;
-  final bool isSynced;
+  final bool isInsideSource;
 
   const _InsideFolderScreen({
     required this.folderPath,
     required this.rootPath,
-    this.isSynced = false,
+    this.isInsideSource = false,
   });
 
   @override
@@ -999,7 +1005,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               ]
             : null,
       ),
-      bottomNavigationBar: _isSelecting
+      bottomNavigationBar: _isSelecting && !widget.isInsideSource
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -1069,25 +1075,32 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                     builder: (_) => _InsideFolderScreen(
                                       folderPath: entity.path,
                                       rootPath: widget.rootPath,
+                                      isInsideSource: widget.isInsideSource ||
+                                          _fileExplorerService.isInsideSource(
+                                            entity.path,
+                                            widget.rootPath,
+                                          ),
                                     ),
                                   ),
                                 );
                                 _loadFiles();
                               }
                             : () => OpenFile.open(entity.path),
-                        onLongPress: () {
-                          if (!_isSelecting) {
-                            setState(() {
-                              _isSelecting = true;
-                              _selectedIndices.add(index);
-                            });
-                          }
-                        },
+                        onLongPress: widget.isInsideSource
+                            ? null
+                            : () {
+                                if (!_isSelecting) {
+                                  setState(() {
+                                    _isSelecting = true;
+                                    _selectedIndices.add(index);
+                                  });
+                                }
+                              },
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
-                              if (_isSelecting) ...[
+                              if (_isSelecting && !widget.isInsideSource) ...[
                                 Icon(
                                   isSelected
                                       ? Icons.check_circle
@@ -1156,7 +1169,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
             Positioned(
               right: 16,
               bottom: 40,
-              child: widget.isSynced
+              child: widget.isInsideSource
                   ? _SyncedFab(isSyncing: _isSyncing, onSync: _syncSource)
                   : _RegularFab(
                       isFabExpanded: _isFabExpanded,
