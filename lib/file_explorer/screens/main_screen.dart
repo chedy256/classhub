@@ -1148,31 +1148,33 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
           : null,
       body: Stack(
         children: [
-          _files.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.upload_file,
-                        color: colorScheme.onSurfaceVariant,
-                        size: 64,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No files yet — tap + to upload',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+          RefreshIndicator(
+            onRefresh: () async => _loadFiles(),
+            child: _files.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.upload_file,
                           color: colorScheme.onSurfaceVariant,
+                          size: 64,
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: _files.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
+                        const SizedBox(height: 16),
+                        Text(
+                          'No files yet — tap + to upload',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                    itemCount: _files.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
                     final entity = _files[index];
                     final isDir = entity is Directory;
                     final name = p.basename(entity.path);
@@ -1294,6 +1296,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                     );
                   },
                 ),
+          ),
           if (!_isSelecting)
             Positioned(
               right: 16,
