@@ -181,25 +181,57 @@ class _MainScreenState extends State<MainScreen>
     });
   }
 
-  Future<void> _createFolder() async {
+  void _createFolder() {
     _toggleFab();
-    final name = await _showTextInputDialog(
-      context,
-      'New Folder',
-      'Folder name',
-      'Create',
+    showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('New Folder'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Folder name'),
+            onSubmitted: (name) {
+              if (name.isNotEmpty) {
+                _fileExplorerService.createFolder(widget.rootPath, name);
+                _loadEntries();
+              }
+              Navigator.pop(ctx);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                if (name.isNotEmpty) {
+                  _fileExplorerService.createFolder(widget.rootPath, name);
+                  _loadEntries();
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
     );
-    if (name != null && name.isNotEmpty) {
-      _fileExplorerService.createFolder(widget.rootPath, name);
-      _loadEntries();
-    }
   }
 
-  Future<void> _uploadFolder() async {
+  Future<void> _uploadFiles() async {
     _toggleFab();
-    final path = await FilePicker.getDirectoryPath();
-    if (path != null) {
-      _fileExplorerService.copyFolderTo(widget.rootPath, path);
+    final result = await FilePicker.pickFiles(allowMultiple: true);
+    if (result != null && result.files.isNotEmpty) {
+      final paths = result.files
+          .where((pf) => pf.path != null)
+          .map((pf) => pf.path!)
+          .toList();
+      _fileExplorerService.uploadFilesToFolder(widget.rootPath, paths);
       _loadEntries();
     }
   }
@@ -632,9 +664,9 @@ class _MainScreenState extends State<MainScreen>
                           ),
                           const SizedBox(height: 10),
                           _FabOption(
-                            label: 'Upload',
-                            icon: Icons.drive_folder_upload_outlined,
-                            onTap: _uploadFolder,
+                            label: 'Files',
+                            icon: Icons.upload_file_outlined,
+                            onTap: _uploadFiles,
                           ),
                           const SizedBox(height: 10),
                           _FabOption(
@@ -788,8 +820,8 @@ class _RegularFab extends StatelessWidget {
   final AnimationController fabAnimController;
   final Animation<double> fabAnimation;
   final VoidCallback onToggle;
-  final VoidCallback onUploadFiles;
-  final VoidCallback onUploadFolder;
+  final VoidCallback onAddFiles;
+  final VoidCallback onCreateFolder;
   final ColorScheme colorScheme;
 
   const _RegularFab({
@@ -797,8 +829,8 @@ class _RegularFab extends StatelessWidget {
     required this.fabAnimController,
     required this.fabAnimation,
     required this.onToggle,
-    required this.onUploadFiles,
-    required this.onUploadFolder,
+    required this.onAddFiles,
+    required this.onCreateFolder,
     required this.colorScheme,
   });
 
@@ -818,15 +850,15 @@ class _RegularFab extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _FabOption(
-                  label: 'Upload folder',
-                  icon: Icons.drive_folder_upload_outlined,
-                  onTap: onUploadFolder,
+                  label: 'Files',
+                  icon: Icons.upload_file_outlined,
+                  onTap: onAddFiles,
                 ),
                 const SizedBox(height: 10),
                 _FabOption(
-                  label: 'Upload files',
-                  icon: Icons.upload_file_outlined,
-                  onTap: onUploadFiles,
+                  label: 'Folder',
+                  icon: Icons.create_new_folder_outlined,
+                  onTap: onCreateFolder,
                 ),
                 const SizedBox(height: 14),
               ],
@@ -927,6 +959,48 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     });
   }
 
+  void _createFolder() {
+    _toggleFab();
+    showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('New Folder'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Folder name'),
+            onSubmitted: (name) {
+              if (name.isNotEmpty) {
+                _fileExplorerService.createFolder(widget.folderPath, name);
+                _loadFiles();
+              }
+              Navigator.pop(ctx);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                if (name.isNotEmpty) {
+                  _fileExplorerService.createFolder(widget.folderPath, name);
+                  _loadFiles();
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _uploadFiles() async {
     _toggleFab();
     final result = await FilePicker.pickFiles(allowMultiple: true);
@@ -936,15 +1010,6 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
           .map((pf) => pf.path!)
           .toList();
       _fileExplorerService.uploadFilesToFolder(widget.folderPath, paths);
-      _loadFiles();
-    }
-  }
-
-  Future<void> _uploadFolder() async {
-    _toggleFab();
-    final path = await FilePicker.getDirectoryPath();
-    if (path != null) {
-      _fileExplorerService.copyFolderTo(widget.folderPath, path);
       _loadFiles();
     }
   }
@@ -1240,8 +1305,8 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                       fabAnimController: _fabAnimController,
                       fabAnimation: _fabAnimation,
                       onToggle: _toggleFab,
-                      onUploadFiles: _uploadFiles,
-                      onUploadFolder: _uploadFolder,
+                      onAddFiles: _uploadFiles,
+                      onCreateFolder: _createFolder,
                       colorScheme: colorScheme,
                     ),
             ),
