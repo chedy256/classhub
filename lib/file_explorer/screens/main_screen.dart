@@ -387,7 +387,7 @@ class _MainScreenState extends State<MainScreen>
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: OutlinedButton.icon(
                         onPressed: _selectedIndices.isEmpty
                             ? null
                             : _deleteSelected,
@@ -1003,7 +1003,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: _selectedIndices.isEmpty ? null : _deleteSelected,
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('Move to trash'),
