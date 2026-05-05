@@ -42,7 +42,6 @@ class _MainScreenState extends State<MainScreen>
   final TrashService _trashService = TrashService();
   final LinkService _linkService = LinkService();
   List<FileSystemEntity> _entries = [];
-  final Map<int, int?> _folderSizes = {};
 
   @override
   void initState() {
@@ -97,20 +96,8 @@ class _MainScreenState extends State<MainScreen>
     setState(() {
       _entries = _fileExplorerService.loadEntries(widget.rootPath);
       _selectedIndices.clear();
-      _folderSizes.clear();
       if (_entries.isEmpty) _isSelecting = false;
     });
-    _loadFolderSizes();
-  }
-
-  void _loadFolderSizes() {
-    for (int i = 0; i < _entries.length; i++) {
-      if (_entries[i] is Directory) {
-        _fileExplorerService.getFolderSize(_entries[i].path).then((size) {
-          if (mounted) setState(() => _folderSizes[i] = size);
-        });
-      }
-    }
   }
 
   void _toggleFab() {
@@ -505,7 +492,7 @@ class _MainScreenState extends State<MainScreen>
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${_fileExplorerService.entitySubtitle(entity)}${isDir && _folderSizes[index] != null ? ' · ${_fileExplorerService.formatSize(_folderSizes[index]!)}' : ''}',
+                                      _fileExplorerService.entitySubtitle(entity),
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
@@ -806,7 +793,6 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
   bool _isSelecting = false;
   bool _isSyncing = false;
   bool _isFabExpanded = false;
-  final Map<int, int?> _folderSizes = {};
   late AnimationController _fabAnimController;
   late Animation<double> _fabAnimation;
 
@@ -834,20 +820,8 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     setState(() {
       _files = _fileExplorerService.loadFolderContents(widget.folderPath);
       _selectedIndices.clear();
-      _folderSizes.clear();
       if (_files.isEmpty) _isSelecting = false;
     });
-    _loadFolderSizes();
-  }
-
-  void _loadFolderSizes() {
-    for (int i = 0; i < _files.length; i++) {
-      if (_files[i] is Directory) {
-        _fileExplorerService.getFolderSize(_files[i].path).then((size) {
-          if (mounted) setState(() => _folderSizes[i] = size);
-        });
-      }
-    }
   }
 
   void _toggleFab() {
@@ -1126,7 +1100,9 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                     const SizedBox(height: 4),
                                     Text(
                                       isDir
-                                          ? '${_fileExplorerService.entitySubtitle(entity)}${_folderSizes[index] != null ? ' · ${_fileExplorerService.formatSize(_folderSizes[index]!)}' : ''}'
+                                          ? _fileExplorerService.entitySubtitle(
+                                              entity,
+                                            )
                                           : sizeStr.isNotEmpty
                                           ? '${info.label} · $sizeStr'
                                           : info.label,
