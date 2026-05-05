@@ -136,6 +136,25 @@ class _MainScreenState extends State<MainScreen>
     return url;
   }
 
+  Future<void> _syncSource(Directory sourceDir) async {
+    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
+    final result = await syncEngine.syncSource(sourceDir);
+    if (!mounted) return;
+    if (result.success) {
+      _loadEntries();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _watcher.stop();
@@ -275,6 +294,10 @@ class _MainScreenState extends State<MainScreen>
       _loadEntries,
       rootPath: widget.rootPath,
       trashService: _trashService,
+      onSync: entity is Directory &&
+              _fileExplorerService.isSyncedSource(entity.path)
+          ? () => _syncSource(entity)
+          : null,
     );
   }
 
@@ -933,22 +956,17 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     setState(() => _isSyncing = false);
     if (!mounted) return;
     if (result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
       _loadFiles();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sync failed: ${result.error}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          ),
+        );
+      }
     }
   }
 
