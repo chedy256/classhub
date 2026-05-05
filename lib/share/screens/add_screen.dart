@@ -1,18 +1,9 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'package:classhub/share/services/deep_link_service.dart';
-import 'package:sync_engine/sync_engine.dart';
 
 class AddSourceDialog extends StatefulWidget {
   final List<String> incomingUrls;
-  final String? rootPath;
-  final VoidCallback? onAdded;
-  const AddSourceDialog({
-    super.key,
-    this.incomingUrls = const [],
-    this.rootPath,
-    this.onAdded,
-  });
+  const AddSourceDialog({super.key, this.incomingUrls = const []});
 
   @override
   State<AddSourceDialog> createState() => _AddSourceDialogState();
@@ -66,58 +57,7 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
   }
 
   void _addUrlDirectly(String url) {
-    if (widget.rootPath == null) {
-      _showSnack('No root path available');
-      return;
-    }
-    _addSourcesInBackground([url]);
-  }
-
-  void _addSourcesInBackground(List<String> urlsToAdd) {
-    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath!));
-
-    _showSnack('Adding ${urlsToAdd.length} source(s)...', duration: const Duration(seconds: 30));
-    
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _closeDialog();
-    });
-
-    Future(() async {
-      int success = 0;
-      final errors = <String>[];
-
-      for (var i = 0; i < urlsToAdd.length; i++) {
-        if (!mounted) return;
-
-        _showSnack(
-          'Adding ${i + 1}/${urlsToAdd.length}...',
-          duration: const Duration(seconds: 30),
-        );
-
-        try {
-          final result = await syncEngine.addSource(urlsToAdd[i]);
-          if (result.success) {
-            success++;
-          } else {
-            errors.add('${_getRepoName(urlsToAdd[i])}: ${result.error}');
-          }
-        } catch (e) {
-          errors.add('${_getRepoName(urlsToAdd[i])}: $e');
-        }
-      }
-
-      if (!mounted) return;
-
-      widget.onAdded?.call();
-
-      if (success == urlsToAdd.length) {
-        _showSnack('$success source(s) added');
-      } else if (success > 0) {
-        _showSnack('$success added, ${errors.length} failed');
-      } else {
-        _showSnack('Error: ${errors.first}');
-      }
-    });
+    Navigator.pop(context, [url]);
   }
 
   void _toggleSelect(int index) {
@@ -135,15 +75,10 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
       _showSnack('Select at least one source');
       return;
     }
-
-    final urlsToAdd = _selected.map((i) => _urls[i]).toList();
-    _addSourcesInBackground(urlsToAdd);
-  }
-
-  void _closeDialog() {
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    Navigator.pop(
+      context,
+      _selected.map((i) => _urls[i]).toList(),
+    );
   }
 
   String _getRepoName(String url) {
@@ -157,12 +92,9 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
     return url;
   }
 
-  void _showSnack(String message, {Duration? duration}) {
+  void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: duration ?? const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message)),
     );
   }
 

@@ -71,23 +71,69 @@ class _MainScreenState extends State<MainScreen>
     });
   }
 
-  void _openAddScreen(List<String> urls) {
-    showDialog(
+  Future<void> _openAddScreen(List<String> urls) async {
+    final selectedUrls = await showDialog<List<String>>(
       context: context,
-      builder: (_) => AddSourceDialog(
-        incomingUrls: urls,
-        rootPath: widget.rootPath,
-        onAdded: _loadEntries,
-      ),
+      builder: (_) => AddSourceDialog(incomingUrls: urls),
     );
+    if (selectedUrls != null && mounted) {
+      for (final url in selectedUrls) {
+        await _addSingleSource(url);
+      }
+    }
   }
 
-  void _addSource() {
-    showDialog(
+  Future<void> _addSource() async {
+    if (_isFabExpanded) {
+      setState(() {
+        _isFabExpanded = false;
+        _fabAnimController.reverse();
+      });
+    }
+    final selectedUrls = await showDialog<List<String>>(
       context: context,
-      builder: (_) =>
-          AddSourceDialog(rootPath: widget.rootPath, onAdded: _loadEntries),
+      builder: (_) => const AddSourceDialog(),
     );
+    if (selectedUrls != null && mounted) {
+      for (final url in selectedUrls) {
+        await _addSingleSource(url);
+      }
+    }
+  }
+
+  Future<void> _addSingleSource(String url) async {
+    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
+    final result = await syncEngine.addSource(url);
+    if (!mounted) return;
+    _loadEntries();
+    final color = Theme.of(context).colorScheme.inversePrimary;
+    final name = _getRepoName(url);
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$name: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+          ),
+          backgroundColor: color,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$name: ${result.error}'),
+          backgroundColor: color,
+        ),
+      );
+    }
+  }
+
+  String _getRepoName(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final segments = uri.path.split('/').where((s) => s.isNotEmpty).toList();
+      if (segments.length >= 2) return segments[1];
+    } catch (_) {}
+    return url;
   }
 
   @override
