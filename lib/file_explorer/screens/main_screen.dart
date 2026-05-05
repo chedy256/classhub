@@ -5,6 +5,7 @@ import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:sync_engine/sync_engine.dart';
 import '../models/file_type_info.dart';
+import '../services/directory_watcher.dart';
 import '../services/file_explorer_service.dart';
 import '../services/trash_service.dart';
 import 'search_screen.dart';
@@ -41,6 +42,7 @@ class _MainScreenState extends State<MainScreen>
   final FileExplorerService _fileExplorerService = FileExplorerService();
   final TrashService _trashService = TrashService();
   final LinkService _linkService = LinkService();
+  late DirectoryWatcher _watcher;
   List<FileSystemEntity> _entries = [];
 
   @override
@@ -56,6 +58,8 @@ class _MainScreenState extends State<MainScreen>
     );
     _loadEntries();
     _initDeepLinks();
+    _watcher = DirectoryWatcher(path: widget.rootPath, onChanged: _loadEntries);
+    _watcher.start();
   }
 
   void _initDeepLinks() {
@@ -88,6 +92,7 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   void dispose() {
+    _watcher.stop();
     _fabAnimController.dispose();
     super.dispose();
   }
@@ -791,6 +796,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     with SingleTickerProviderStateMixin {
   final FileExplorerService _fileExplorerService = FileExplorerService();
   final TrashService _trashService = TrashService();
+  late DirectoryWatcher _watcher;
   List<FileSystemEntity> _files = [];
   final Set<int> _selectedIndices = {};
   bool _isSelecting = false;
@@ -811,10 +817,13 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
       curve: Curves.easeOut,
     );
     _loadFiles();
+    _watcher = DirectoryWatcher(path: widget.folderPath, onChanged: _loadFiles);
+    _watcher.start();
   }
 
   @override
   void dispose() {
+    _watcher.stop();
     _fabAnimController.dispose();
     super.dispose();
   }
