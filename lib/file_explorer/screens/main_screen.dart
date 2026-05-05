@@ -389,8 +389,10 @@ class _MainScreenState extends State<MainScreen>
           : null,
       body: Stack(
         children: [
-          _entries.isEmpty
-              ? Center(
+          RefreshIndicator(
+            onRefresh: () async => _loadEntries(),
+            child: _entries.isEmpty
+                ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -513,6 +515,7 @@ class _MainScreenState extends State<MainScreen>
                     );
                   },
                 ),
+          ),
           if (_isFabExpanded && !_isSelecting)
             GestureDetector(
               onTap: _toggleFab,
