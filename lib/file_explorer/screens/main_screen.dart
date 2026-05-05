@@ -222,7 +222,14 @@ class _MainScreenState extends State<MainScreen>
   }
 
   void _showItemMenu(FileSystemEntity entity) {
-    _showEntityMenu(context, entity, _fileExplorerService, _loadEntries);
+    _showEntityMenu(
+      context,
+      entity,
+      _fileExplorerService,
+      _loadEntries,
+      rootPath: widget.rootPath,
+      trashService: _trashService,
+    );
   }
 
   Future<void> _openSearch() async {
@@ -924,7 +931,14 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
   }
 
   void _showFileMenu(FileSystemEntity entity) {
-    _showEntityMenu(context, entity, _fileExplorerService, _loadFiles);
+    _showEntityMenu(
+      context,
+      entity,
+      _fileExplorerService,
+      _loadFiles,
+      rootPath: widget.rootPath,
+      trashService: _trashService,
+    );
   }
 
   void _deleteSelected() {
@@ -1194,8 +1208,12 @@ void _showEntityMenu(
   BuildContext context,
   FileSystemEntity entity,
   FileExplorerService service,
-  VoidCallback onRefresh,
-) {
+  VoidCallback onRefresh, {
+  required String rootPath,
+  required TrashService trashService,
+  Future<void> Function()? onSync,
+}) {
+  final insideSource = service.isInsideSource(entity.path, rootPath);
   final isSource = entity is Directory && service.isSyncedSource(entity.path);
   final linkService = LinkService();
   final sourceUrl = isSource ? service.getSourceUrl(entity.path) : null;
@@ -1206,24 +1224,66 @@ void _showEntityMenu(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ListTile(
-            leading: const Icon(Icons.edit_outlined),
-            title: const Text('Rename'),
-            onTap: () async {
-              Navigator.pop(ctx);
-              final oldName = p.basename(entity.path);
-              final newName = await _showTextInputDialog(
-                context,
-                'Rename',
-                oldName,
-                'Rename',
-              );
-              if (newName != null && newName.isNotEmpty && newName != oldName) {
-                service.renameEntity(entity, newName);
-                onRefresh();
-              }
-            },
-          ),
+          if (!insideSource || isSource)
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final oldName = p.basename(entity.path);
+                final newName = await _showTextInputDialog(
+                  context,
+                  'Rename',
+                  oldName,
+                  'Rename',
+                );
+                if (newName != null &&
+                    newName.isNotEmpty &&
+                    newName != oldName) {
+                  service.renameEntity(entity, newName);
+                  onRefresh();
+                }
+              },
+            ),
+          if (!insideSource || isSource)
+            ListTile(
+              leading: const Icon(Icons.delete_outlined),
+              title: const Text('Delete'),
+              onTap: () {
+                Navigator.pop(ctx);
+                final name = p.basename(entity.path);
+                showDialog(
+                  context: context,
+                  builder: (dialogCtx) => AlertDialog(
+                    title: const Text('Move to Trash'),
+                    content: Text('$name will be deleted after 30 days.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(dialogCtx);
+                          trashService.moveToTrash(rootPath, entity);
+                          onRefresh();
+                        },
+                        child: const Text('Move to trash'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          if (onSync != null)
+            ListTile(
+              leading: const Icon(Icons.sync),
+              title: const Text('Sync'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onSync();
+              },
+            ),
           if (sourceUrl != null)
             ListTile(
               leading: const Icon(Icons.share),
