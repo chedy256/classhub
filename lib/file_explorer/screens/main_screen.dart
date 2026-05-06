@@ -16,16 +16,14 @@ import 'support_screen.dart';
 import 'about_screen.dart';
 import 'package:classhub/share/screens/add_screen.dart';
 import 'package:classhub/share/services/deep_link_service.dart';
+import '../../core/services/update_checker.dart';
+import '../../core/services/classhub_storage_service.dart';
 
 class MainScreen extends StatefulWidget {
   final String rootPath;
   final void Function(ThemeMode)? onThemeChanged;
 
-  const MainScreen({
-    super.key,
-    required this.rootPath,
-    this.onThemeChanged,
-  });
+  const MainScreen({super.key, required this.rootPath, this.onThemeChanged});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -46,6 +44,7 @@ class _MainScreenState extends State<MainScreen>
   final SyncTracker _syncTracker = SyncTracker();
   late DirectoryWatcher _watcher;
   List<FileSystemEntity> _entries = [];
+  UpdateInfo? _updateInfo;
 
   @override
   void initState() {
@@ -62,6 +61,50 @@ class _MainScreenState extends State<MainScreen>
     _initDeepLinks();
     _watcher = DirectoryWatcher(path: widget.rootPath, onChanged: _loadEntries);
     _watcher.start();
+    _recoverInterruptedSyncs();
+    _checkForUpdate();
+  }
+
+  Future<void> _checkForUpdate() async {
+    final lastCheck = await ClasshubStorageService.getLastUpdateCheck();
+    if (lastCheck != null &&
+        DateTime.now().difference(lastCheck) < const Duration(hours: 6)) {
+      return;
+    }
+
+    await ClasshubStorageService.saveLastUpdateCheck(DateTime.now());
+    final info = await checkForUpdate();
+    if (mounted) {
+      setState(() => _updateInfo = info);
+    }
+  }
+
+  Future<void> _recoverInterruptedSyncs() async {
+    final staleSources = await SyncEngine.detectStaleSyncs(
+      Directory(widget.rootPath),
+    );
+    if (staleSources.isEmpty) return;
+
+    final names = staleSources.map((d) => p.basename(d.path)).toList();
+    final joined = names.join(', ');
+    if (!mounted) return;
+
+    final lockService = LockService();
+    for (final source in staleSources) {
+      final name = p.basename(source.path);
+      await lockService.deleteLock(Directory(widget.rootPath), name);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Resuming downloads: $joined'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
+    for (final source in staleSources) {
+      _syncSource(source);
+    }
   }
 
   void _initDeepLinks() {
@@ -79,9 +122,7 @@ class _MainScreenState extends State<MainScreen>
       builder: (_) => AddSourceDialog(incomingUrls: urls),
     );
     if (selectedUrls != null && mounted) {
-      for (final url in selectedUrls) {
-        await _addSingleSource(url);
-      }
+      await Future.wait(selectedUrls.map(_addSingleSource));
     }
   }
 
@@ -97,9 +138,7 @@ class _MainScreenState extends State<MainScreen>
       builder: (_) => const AddSourceDialog(),
     );
     if (selectedUrls != null && mounted) {
-      for (final url in selectedUrls) {
-        await _addSingleSource(url);
-      }
+      await Future.wait(selectedUrls.map(_addSingleSource));
     }
   }
 
@@ -111,6 +150,7 @@ class _MainScreenState extends State<MainScreen>
     final trackerCallback = _syncTracker.start(repoPath);
     final syncEngine = SyncEngine(
       appFolder: Directory(widget.rootPath),
+      githubToken: await ClasshubStorageService.getGithubToken(),
       onProgress: (progress) {
         if (!mounted) return;
         if (_firstProgress) {
@@ -125,21 +165,18 @@ class _MainScreenState extends State<MainScreen>
     _syncTracker.clearProgress(repoPath);
     if (!mounted) return;
     _loadEntries();
-    final color = Theme.of(context).colorScheme.inversePrimary;
     if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             '$repoName: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
           ),
-          backgroundColor: color,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$repoName: ${result.error}'),
-          backgroundColor: color,
         ),
       );
     }
@@ -166,6 +203,7 @@ class _MainScreenState extends State<MainScreen>
     final trackerCallback = _syncTracker.start(sourcePath);
     final syncEngine = SyncEngine(
       appFolder: Directory(widget.rootPath),
+      githubToken: await ClasshubStorageService.getGithubToken(),
       onProgress: (progress) {
         if (mounted) trackerCallback(progress);
       },
@@ -179,9 +217,8 @@ class _MainScreenState extends State<MainScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+            'Synced ${p.basename(sourceDir.path)}: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
           ),
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
       );
     }
@@ -358,7 +395,8 @@ class _MainScreenState extends State<MainScreen>
       _loadEntries,
       rootPath: widget.rootPath,
       trashService: _trashService,
-      onSync: entity is Directory &&
+      onSync:
+          entity is Directory &&
               _fileExplorerService.isSyncedSource(entity.path)
           ? () => _syncSource(entity)
           : null,
@@ -457,6 +495,7 @@ class _MainScreenState extends State<MainScreen>
               _DrawerItem(
                 icon: Icons.info,
                 label: 'About',
+                showBadge: _updateInfo != null,
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -466,7 +505,6 @@ class _MainScreenState extends State<MainScreen>
                 },
               ),
               const Spacer(),
-              
             ],
           ),
         ),
@@ -478,9 +516,27 @@ class _MainScreenState extends State<MainScreen>
                 onPressed: _cancelSelection,
               )
             : Builder(
-                builder: (ctx) => IconButton(
-                  icon: Icon(Icons.menu, color: colorScheme.onSurface),
-                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                builder: (ctx) => Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.menu, color: colorScheme.onSurface),
+                      onPressed: () => Scaffold.of(ctx).openDrawer(),
+                    ),
+                    if (_updateInfo != null)
+                      Positioned(
+                        right: 12,
+                        top: 12,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
         title: _isSelecting
@@ -543,152 +599,155 @@ class _MainScreenState extends State<MainScreen>
             onRefresh: () async => _loadEntries(),
             child: _entries.isEmpty
                 ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.folder_open,
-                        color: colorScheme.onSurfaceVariant,
-                        size: 64,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No items yet',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.folder_open,
                           color: colorScheme.onSurfaceVariant,
+                          size: 64,
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              : ValueListenableBuilder<Map<String, SyncProgress>>(
-                  valueListenable: _syncTracker.progress,
-                  builder: (context, syncProgress, _) {
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                      itemCount: _entries.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final entity = _entries[index];
-                        final isDir = entity is Directory;
-                        final name = p.basename(entity.path);
-                        final isSelected = _selectedIndices.contains(index);
-                        final progress = syncProgress[entity.path];
+                        const SizedBox(height: 16),
+                        Text(
+                          'No items yet',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ValueListenableBuilder<Map<String, SyncProgress>>(
+                    valueListenable: _syncTracker.progress,
+                    builder: (context, syncProgress, _) {
+                      return ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        itemCount: _entries.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final entity = _entries[index];
+                          final isDir = entity is Directory;
+                          final name = p.basename(entity.path);
+                          final isSelected = _selectedIndices.contains(index);
+                          final progress = syncProgress[entity.path];
 
-                    return Card(
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: _isSelecting
-                            ? () => _toggleSelect(index)
-                            : isDir
-                            ? () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => _InsideFolderScreen(
-                                      folderPath: entity.path,
-                                      rootPath: widget.rootPath,
-                                      isInsideSource: _fileExplorerService
-                                          .isInsideSource(
-                                            entity.path,
-                                            widget.rootPath,
+                          return Card(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: _isSelecting
+                                  ? () => _toggleSelect(index)
+                                  : isDir
+                                  ? () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => _InsideFolderScreen(
+                                            folderPath: entity.path,
+                                            rootPath: widget.rootPath,
+                                            isInsideSource: _fileExplorerService
+                                                .isInsideSource(
+                                                  entity.path,
+                                                  widget.rootPath,
+                                                ),
+                                            syncTracker: _syncTracker,
                                           ),
-                                      syncTracker: _syncTracker,
-                                    ),
-                                  ),
-                                );
-                                _loadEntries();
-                              }
-                            : () => OpenFile.open(entity.path),
-                        onLongPress: () {
-                          if (!_isSelecting) {
-                            setState(() {
-                              _isSelecting = true;
-                              _selectedIndices.add(index);
-                            });
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              if (_isSelecting) ...[
-                                Icon(
-                                  isSelected
-                                      ? Icons.check_circle
-                                      : Icons.radio_button_unchecked,
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 12),
-                              ],
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  isDir
-                                      ? Icons.folder_outlined
-                                      : Icons.description_outlined,
-                                  color: colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                        ),
+                                      );
+                                      _loadEntries();
+                                    }
+                                  : () => OpenFile.open(entity.path),
+                              onLongPress: () {
+                                if (!_isSelecting) {
+                                  setState(() {
+                                    _isSelecting = true;
+                                    _selectedIndices.add(index);
+                                  });
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
                                   children: [
-                                    Text(
-                                      name,
-                                      style: theme.textTheme.bodyLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                      overflow: TextOverflow.ellipsis,
+                                    if (_isSelecting) ...[
+                                      Icon(
+                                        isSelected
+                                            ? Icons.check_circle
+                                            : Icons.radio_button_unchecked,
+                                        color: isSelected
+                                            ? colorScheme.primary
+                                            : colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 12),
+                                    ],
+                                    Container(
+                                      width: 42,
+                                      height: 42,
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        isDir
+                                            ? Icons.folder_outlined
+                                            : Icons.description_outlined,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    if (progress != null) ...[
-                                      LinearProgressIndicator(
-                                        value: progress.progress,
-                                        minHeight: 3,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _syncProgressText(progress),
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: colorScheme.primary,
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            name,
+                                            style: theme.textTheme.bodyLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          if (progress != null) ...[
+                                            LinearProgressIndicator(
+                                              value: progress.progress,
+                                              minHeight: 3,
                                             ),
-                                      ),
-                                    ] else
-                                      Text(
-                                        _fileExplorerService.entitySubtitle(entity),
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: colorScheme.onSurfaceVariant,
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _syncProgressText(progress),
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: colorScheme.primary,
+                                                  ),
                                             ),
+                                          ] else
+                                            Text(
+                                              _fileExplorerService
+                                                  .entitySubtitle(entity),
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (!_isSelecting)
+                                      IconButton(
+                                        icon: const Icon(Icons.more_vert),
+                                        onPressed: () => _showItemMenu(entity),
                                       ),
                                   ],
                                 ),
                               ),
-                              if (!_isSelecting)
-                                IconButton(
-                                  icon: const Icon(Icons.more_vert),
-                                  onPressed: () => _showItemMenu(entity),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
+                            ),
+                          );
+                        },
+                      );
                     },
-                  );
-                },
-              ),
+                  ),
           ),
           if (_isFabExpanded && !_isSelecting)
             GestureDetector(
@@ -812,17 +871,37 @@ class _DrawerItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool showBadge;
 
   const _DrawerItem({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.showBadge = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon),
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(icon),
+          if (showBadge)
+            Positioned(
+              right: -4,
+              top: 0,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
       title: Text(label),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1075,9 +1154,11 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     setState(() => _isSyncing = true);
     final sourcePath = widget.folderPath;
 
-    final trackerCallback = widget.syncTracker?.start(sourcePath) ?? _noopCallback;
+    final trackerCallback =
+        widget.syncTracker?.start(sourcePath) ?? _noopCallback;
     final syncEngine = SyncEngine(
       appFolder: Directory(widget.rootPath),
+      githubToken: await ClasshubStorageService.getGithubToken(),
       onProgress: (progress) {
         if (mounted) trackerCallback(progress);
       },
@@ -1092,9 +1173,8 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+            'Synced ${p.basename(widget.folderPath)}: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
           ),
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
       );
     }
@@ -1202,9 +1282,11 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_isSelecting
-                    ? '${_selectedIndices.length} selected'
-                    : p.basename(widget.folderPath)),
+                Text(
+                  _isSelecting
+                      ? '${_selectedIndices.length} selected'
+                      : p.basename(widget.folderPath),
+                ),
                 if (progress != null && !_isSelecting)
                   Text(
                     _syncProgressText(progress),
@@ -1270,128 +1352,130 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                     itemCount: _files.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                    final entity = _files[index];
-                    final isDir = entity is Directory;
-                    final name = p.basename(entity.path);
-                    final info = FileTypeInfo.classify(
-                      name,
-                      isDirectory: isDir,
-                    );
-                    final isSelected = _selectedIndices.contains(index);
+                      final entity = _files[index];
+                      final isDir = entity is Directory;
+                      final name = p.basename(entity.path);
+                      final info = FileTypeInfo.classify(
+                        name,
+                        isDirectory: isDir,
+                      );
+                      final isSelected = _selectedIndices.contains(index);
 
-                    String sizeStr = '';
-                    if (entity is File) {
-                      try {
-                        sizeStr = _fileExplorerService.formatSize(
-                          entity.lengthSync(),
-                        );
-                      } catch (_) {}
-                    }
+                      String sizeStr = '';
+                      if (entity is File) {
+                        try {
+                          sizeStr = _fileExplorerService.formatSize(
+                            entity.lengthSync(),
+                          );
+                        } catch (_) {}
+                      }
 
-                    return Card(
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: _isSelecting
-                            ? () => _toggleSelect(index)
-                            : isDir
-                            ? () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => _InsideFolderScreen(
-                                      folderPath: entity.path,
-                                      rootPath: widget.rootPath,
-                                      isInsideSource: widget.isInsideSource ||
-                                          _fileExplorerService.isInsideSource(
-                                            entity.path,
-                                            widget.rootPath,
-                                          ),
-                                      syncTracker: widget.syncTracker,
+                      return Card(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: _isSelecting
+                              ? () => _toggleSelect(index)
+                              : isDir
+                              ? () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => _InsideFolderScreen(
+                                        folderPath: entity.path,
+                                        rootPath: widget.rootPath,
+                                        isInsideSource:
+                                            widget.isInsideSource ||
+                                            _fileExplorerService.isInsideSource(
+                                              entity.path,
+                                              widget.rootPath,
+                                            ),
+                                        syncTracker: widget.syncTracker,
+                                      ),
                                     ),
-                                  ),
-                                );
-                                _loadFiles();
-                              }
-                            : () => OpenFile.open(entity.path),
-                        onLongPress: widget.isInsideSource
-                            ? null
-                            : () {
-                                if (!_isSelecting) {
-                                  setState(() {
-                                    _isSelecting = true;
-                                    _selectedIndices.add(index);
-                                  });
+                                  );
+                                  _loadFiles();
                                 }
-                              },
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              if (_isSelecting && !widget.isInsideSource) ...[
-                                Icon(
-                                  isSelected
-                                      ? Icons.check_circle
-                                      : Icons.radio_button_unchecked,
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurfaceVariant,
+                              : () => OpenFile.open(entity.path),
+                          onLongPress: widget.isInsideSource
+                              ? null
+                              : () {
+                                  if (!_isSelecting) {
+                                    setState(() {
+                                      _isSelecting = true;
+                                      _selectedIndices.add(index);
+                                    });
+                                  }
+                                },
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                if (_isSelecting && !widget.isInsideSource) ...[
+                                  Icon(
+                                    isSelected
+                                        ? Icons.check_circle
+                                        : Icons.radio_button_unchecked,
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    info.icon,
+                                    color: colorScheme.onPrimaryContainer,
+                                  ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name,
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        isDir
+                                            ? _fileExplorerService
+                                                  .entitySubtitle(entity)
+                                            : sizeStr.isNotEmpty
+                                            ? '${info.label} · $sizeStr'
+                                            : info.label,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (!_isSelecting)
+                                  IconButton(
+                                    icon: const Icon(Icons.more_vert),
+                                    onPressed: () => _showFileMenu(entity),
+                                  ),
                               ],
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  info.icon,
-                                  color: colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      name,
-                                      style: theme.textTheme.bodyLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      isDir
-                                          ? _fileExplorerService.entitySubtitle(
-                                              entity,
-                                            )
-                                          : sizeStr.isNotEmpty
-                                          ? '${info.label} · $sizeStr'
-                                          : info.label,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (!_isSelecting)
-                                IconButton(
-                                  icon: const Icon(Icons.more_vert),
-                                  onPressed: () => _showFileMenu(entity),
-                                ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
           ),
           if (!_isSelecting)
             Positioned(
@@ -1679,18 +1763,9 @@ class _PropertiesDialogState extends State<_PropertiesDialog> {
               const Divider(height: 24),
               _propRow('Type', _config!['type']?.toString() ?? '-'),
               _propRow('URL', _config!['url']?.toString() ?? '-'),
-              _propRow(
-                'Branch',
-                _config!['default_branch']?.toString() ?? '-',
-              ),
-              _propRow(
-                'Status',
-                _config!['sync_status']?.toString() ?? '-',
-              ),
-              _propRow(
-                'Checkpoint',
-                _config!['checkpoint']?.toString() ?? '-',
-              ),
+              _propRow('Branch', _config!['default_branch']?.toString() ?? '-'),
+              _propRow('Status', _config!['sync_status']?.toString() ?? '-'),
+              _propRow('Checkpoint', _config!['checkpoint']?.toString() ?? '-'),
               if (_config!['last_synced_at'] != null)
                 _propRow(
                   'Last Synced',

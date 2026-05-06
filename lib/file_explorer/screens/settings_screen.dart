@@ -14,6 +14,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String _currentPath = '';
   ThemeMode _themeMode = ThemeMode.system;
+  String _githubToken = '';
 
   @override
   void initState() {
@@ -24,9 +25,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadData() async {
     final path = await ClasshubStorageService.getPath();
     final theme = await ClasshubStorageService.getThemeMode();
+    final token = await ClasshubStorageService.getGithubToken();
     setState(() {
       _currentPath = path ?? '';
       _themeMode = theme;
+      _githubToken = token ?? '';
     });
   }
 
@@ -49,6 +52,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _themeMode = mode);
     debugPrint('[Settings] calling onThemeChanged callback');
     widget.onThemeChanged?.call(mode);
+  }
+
+  Future<void> _editGithubToken() async {
+    final controller = TextEditingController(text: _githubToken);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('GitHub Token'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                hintText: 'ghp_xxxxxxxxxxxxxxxxxxxx',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Optional - avoids GitHub API rate limits for updates and syncing.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final newToken = controller.text.trim();
+      await ClasshubStorageService.saveGithubToken(
+          newToken.isEmpty ? null : newToken);
+      setState(() => _githubToken = newToken);
+    }
   }
 
   @override
@@ -108,6 +159,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: _changePath,
+          ),
+          const Divider(),
+          ListTile(
+            title: const Text('GitHub Token (optional)'),
+            subtitle: Text(
+              _githubToken.isEmpty
+                  ? 'Avoids GitHub API rate limits'
+                  : '${_githubToken.substring(0, 8)}...',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _editGithubToken,
           ),
           const Divider(),
         ],

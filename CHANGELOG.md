@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.2.0 - 2026-05-06
+
+### Added
+
+- Auto-resume interrupted syncs on app launch with snackbar notification
+- Update check on startup (6-hour rate limit) with badge on menu and About screen
+- GitHub token setting in Settings screen to avoid API rate limits
+- Parallel source adding when using ClassHub URLs
+- Folder name in sync completion snackbar
+
+### Changed
+
+- Sync engine uses GitHub token from settings for all API calls
+- Update checker respects GitHub token for higher rate limits
+
+### Fixed
+
+- Independent progress tracking for concurrent syncs (no cross-contamination)
+- Unified snackbar theme color across all screens
+- Sync snackbar shows source folder name for clarity
+
+---
+
 ## v1.1.0 - 2026-05-06
 
 ### Added

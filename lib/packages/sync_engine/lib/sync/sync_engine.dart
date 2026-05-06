@@ -18,6 +18,7 @@ import 'sources/source_syncer.dart';
 
 import 'sources/github/syncer.dart';
 import 'sources/github/parser.dart';
+import 'sources/github/http_client.dart';
 
 // import 'sources/classroom/syncer.dart';
 // import 'sources/classroom/parser.dart';
@@ -45,8 +46,9 @@ class SyncEngine {
 
   SyncEngine({
     required this.appFolder,
-    this.lockStalenessDuration = const Duration(seconds: 10),
+    this.lockStalenessDuration = const Duration(seconds: 6),
     this.verbose = false,
+    String? githubToken,
     SourceStore? sourceStore,
     FileWriter? fileWriter,
     SyncQueueService? queueService,
@@ -55,11 +57,39 @@ class SyncEngine {
     Map<SourceType, SourceSyncer>? syncers,
     this.onProgress,
   }) : _sourceStore = sourceStore ?? SourceStore(),
-        _fileWriter = fileWriter ?? FileWriter(),
-        _queueService = queueService ?? SyncQueueService(),
-        _lockService = lockService ?? LockService(),
-        _parsers = parsers ?? [GithubParser()],
-        _syncers = syncers ?? {SourceType.github: GithubSyncer()};
+       _fileWriter = fileWriter ?? FileWriter(),
+       _queueService = queueService ?? SyncQueueService(),
+       _lockService = lockService ?? LockService(),
+       _parsers = parsers ?? [GithubParser(HttpClient(token: githubToken))],
+       _syncers = syncers ?? {SourceType.github: GithubSyncer(HttpClient(token: githubToken))};
+
+  /// Scans a root directory for sources with interrupted syncs.
+  ///
+  /// Returns a list of [Directory] objects for sources that have a pending
+  /// queue file or any lock file (all considered stale on app launch).
+  static Future<List<Directory>> detectStaleSyncs(Directory appFolder) async {
+    final staleSources = <Directory>[];
+    if (!await appFolder.exists()) return staleSources;
+
+    final lockService = LockService();
+    final queueService = SyncQueueService();
+
+    await for (final entity in appFolder.list()) {
+      if (entity is! Directory) continue;
+      final dir = entity;
+      final name = dir.uri.pathSegments.where((s) => s.isNotEmpty).last;
+      if (name.startsWith('.')) continue;
+
+      final hasQueue = await queueService.hasPending(dir);
+      final hasLock = lockService.exists(appFolder, name);
+
+      if (hasQueue || hasLock) {
+        staleSources.add(dir);
+      }
+    }
+
+    return staleSources;
+  }
 
   /// Adds a new source by parsing its URL, creating the source folder,
   /// and performing the initial sync. On failure, the partial folder is
