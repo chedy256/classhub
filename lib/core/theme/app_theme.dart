@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   static ThemeData build(ColorScheme? dynamicScheme, Brightness brightness) {
-    final scheme = dynamicScheme ??
+    final scheme =
+        dynamicScheme ??
         ColorScheme.fromSeed(
           seedColor: const Color(0xFF5C6BC0),
           brightness: brightness,
@@ -41,15 +42,26 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: scheme.surfaceContainerHighest,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: scheme.primary, width: 2)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.primary, width: 2),
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         ),
       ),
@@ -57,11 +69,16 @@ class AppTheme {
         style: TextButton.styleFrom(foregroundColor: scheme.primary),
       ),
       iconTheme: IconThemeData(color: scheme.onSurfaceVariant),
-      dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1),
+      dividerTheme: DividerThemeData(
+        color: scheme.outlineVariant,
+        thickness: 1,
+      ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surface,
@@ -69,7 +86,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: scheme.inverseSurface,
+        backgroundColor: scheme.inversePrimary,
         contentTextStyle: TextStyle(color: scheme.onInverseSurface),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -93,3 +110,4 @@ class AppTheme {
     );
   }
 }
+
