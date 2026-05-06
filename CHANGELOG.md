@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.1 - 2026-05-06
+
+### Added
+
+- Source type icons on synced folders (GitHub, Drive, Classroom)
+
+---
+
 ## v1.2.0 - 2026-05-06
 
 ### Added
