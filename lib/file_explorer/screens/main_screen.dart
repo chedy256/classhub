@@ -176,11 +176,9 @@ class _MainScreenState extends State<MainScreen>
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$repoName: ${result.error}'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$repoName: ${result.error}')));
     }
   }
 
@@ -618,7 +616,9 @@ class _MainScreenState extends State<MainScreen>
                           final isSelected = _selectedIndices.contains(index);
                           final progress = syncProgress[entity.path];
                           final sourceConfig = isDir
-                              ? _fileExplorerService.getSourceConfig(entity.path)
+                              ? _fileExplorerService.getSourceConfig(
+                                  entity.path,
+                                )
                               : null;
 
                           return Card(
@@ -676,8 +676,8 @@ class _MainScreenState extends State<MainScreen>
                                         color: colorScheme.primaryContainer,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: Icon(
-                                        sourceConfig?.type.icon,
+                                      child: (sourceConfig?.type).iconWidget(
+                                        size: 24,
                                         color: colorScheme.onPrimaryContainer,
                                       ),
                                     ),
@@ -711,9 +711,12 @@ class _MainScreenState extends State<MainScreen>
                                             ),
                                           ] else if (sourceConfig != null)
                                             Text(
-                                              _fileExplorerService.formatLastSynced(
-                                                sourceConfig.lastSyncedAt,
-                                              ) ?? 'Not synced',
+                                              _fileExplorerService
+                                                      .formatLastSynced(
+                                                        sourceConfig
+                                                            .lastSyncedAt,
+                                                      ) ??
+                                                  'Not synced',
                                               style: theme.textTheme.bodySmall
                                                   ?.copyWith(
                                                     color: colorScheme
@@ -1261,7 +1264,9 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
           valueListenable: widget.syncTracker?.progress ?? ValueNotifier({}),
           builder: (context, syncProgress, _) {
             final progress = syncProgress[widget.folderPath];
-            final sourceConfig = _fileExplorerService.getSourceConfig(widget.folderPath);
+            final sourceConfig = _fileExplorerService.getSourceConfig(
+              widget.folderPath,
+            );
             final lastSynced = _fileExplorerService.formatLastSynced(
               sourceConfig?.lastSyncedAt,
             );
@@ -1279,8 +1284,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                     ),
                     if (sourceConfig != null && !_isSelecting) ...[
                       const SizedBox(width: 6),
-                      Icon(
-                        sourceConfig.type.icon,
+                      sourceConfig.type.iconWidget(
                         size: 18,
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -1294,7 +1298,9 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                       color: colorScheme.primary,
                     ),
                   )
-                else if (lastSynced != null && sourceConfig != null && !_isSelecting)
+                else if (lastSynced != null &&
+                    sourceConfig != null &&
+                    !_isSelecting)
                   Text(
                     'Synced $lastSynced',
                     style: theme.textTheme.bodySmall?.copyWith(
