@@ -44,6 +44,7 @@ dependencies:
   open_file: ^3.5.11
   flutter_launcher_icons: ^0.14.4
   url_launcher: ^6.3.1
+  http: ^1.2.1
   path: ^1.9.0
   sync_engine:
     path: lib/packages/sync_engine
