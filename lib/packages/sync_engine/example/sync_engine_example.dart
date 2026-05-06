@@ -4,18 +4,20 @@ import 'package:sync_engine/sync_engine.dart';
 void main() async {
   // Initialize
   final appFolder = Directory('/tmp/classhub/');
-  final syncEngine = SyncEngine(appFolder: appFolder);
-  final url = 'https://github.com/da7da7ha/da7da7ha';
+  final syncEngine = SyncEngine(appFolder: appFolder, verbose: true);
+  final url = 'https://github.com/titanknis/nixos';
+  late SyncResult syncResult;
 
   // Add a GitHub source
-  // SyncResult syncResult = await syncEngine.addSource(url);
+  // syncResult = await syncEngine.addSource(url);
   // print(
   //   'GitHub Sync: ${syncResult.success ? "Success" : "Failed: ${syncResult.error}"}',
   // );
+  // print('Sync: ${syncResult.totalChanges} changes');
 
   // Sync the source again (incremental)
-  final sourceFolder = Directory('${appFolder.path}/da7da7ha');
-  var syncResult = await syncEngine.syncSource(
+  final sourceFolder = Directory('${appFolder.path}/nixos');
+  syncResult = await syncEngine.syncSource(
     sourceFolder,
     // forceFullSync: true,
   );
