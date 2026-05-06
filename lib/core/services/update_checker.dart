@@ -6,10 +6,12 @@ import '../version.dart';
 class UpdateInfo {
   final String latestVersion;
   final String releaseUrl;
+  final String apkUrl;
 
   UpdateInfo({
     required this.latestVersion,
     required this.releaseUrl,
+    required this.apkUrl,
   });
 }
 
@@ -36,16 +38,27 @@ Future<UpdateInfo?> checkForUpdate() async {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final tagName = data['tag_name'] as String? ?? '';
     final htmlUrl = data['html_url'] as String? ?? '';
+    final assets = data['assets'] as List? ?? [];
 
     if (tagName.isEmpty || htmlUrl.isEmpty) return null;
 
-    final latestVersion =
-        tagName.startsWith('v') ? tagName.substring(1) : tagName;
+    String apkUrl = '';
+    for (final asset in assets) {
+      if (asset is Map && (asset['name'] as String? ?? '') == 'classhub.apk') {
+        apkUrl = asset['browser_download_url'] as String? ?? '';
+        break;
+      }
+    }
+
+    if (apkUrl.isEmpty) return null;
+
+    final latestVersion = tagName.startsWith('v') ? tagName.substring(1) : tagName;
 
     if (_isNewerVersion(latestVersion, appVersion)) {
       return UpdateInfo(
         latestVersion: latestVersion,
         releaseUrl: htmlUrl,
+        apkUrl: apkUrl,
       );
     }
 
