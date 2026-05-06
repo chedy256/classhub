@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SupportScreen extends StatelessWidget {
@@ -19,14 +20,15 @@ class SupportScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          const SizedBox(height: 24),
           Icon(
-            Icons.favorite,
+            Icons.support,
             size: 80,
             color: theme.colorScheme.primary,
           ),
           const SizedBox(height: 24),
           Text(
-            'Get Help',
+            'Support',
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -42,12 +44,20 @@ class SupportScreen extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.share),
-            title: const Text('share app'),
-            trailing: const Icon(Icons.open_in_new),
-            onTap: () => _openUrl('https://classhub.knisium.com'),
+            title: const Text('Share app'),
+            subtitle: const Text('Send to friends'),
+            trailing: const Icon(Icons.share_outlined),
+            onTap: _shareApp,
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _shareApp() async {
+    await Share.share(
+      'Check out ClassHub: https://classhub.knisium.com',
+      subject: 'ClassHub',
     );
   }
 
