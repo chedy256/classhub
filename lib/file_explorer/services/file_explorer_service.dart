@@ -28,6 +28,16 @@ class FileExplorerService {
     return File(p.join(path, '.source', 'source.json')).existsSync();
   }
 
+  bool isInsideSource(String path, String rootPath) {
+    if (isSyncedSource(path)) return true;
+    String? current = p.dirname(path);
+    while (current != null && current != rootPath && current != p.dirname(current)) {
+      if (isSyncedSource(current)) return true;
+      current = p.dirname(current);
+    }
+    return false;
+  }
+
   String? getSourceUrl(String path) {
     final sourceFile = File(p.join(path, '.source', 'source.json'));
     if (!sourceFile.existsSync()) return null;
@@ -110,6 +120,19 @@ class FileExplorerService {
       }
     }
     return 0;
+  }
+
+  Future<int> getFolderSize(String folderPath) async {
+    final dir = Directory(folderPath);
+    if (!dir.existsSync()) return 0;
+
+    int total = 0;
+    await for (final entity in dir.list(recursive: true)) {
+      if (entity is File) {
+        total += entity.lengthSync();
+      }
+    }
+    return total;
   }
 
   String formatSize(int bytes) {

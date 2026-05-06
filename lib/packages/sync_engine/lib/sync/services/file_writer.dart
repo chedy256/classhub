@@ -22,6 +22,10 @@ class FileWriterResult {
   int get totalChanges => filesAdded + filesUpdated + filesDeleted;
 }
 
+/// Callback type for file-level progress updates.
+/// [relativePath] is the file being processed, [operation] is 'add', 'update', or 'delete'.
+typedef FileProgressCallback = Future<void> Function(String relativePath, String operation);
+
 /// Applies a [List<FileDelta>] to a local folder on disk.
 ///
 /// Responsibilities:
@@ -43,13 +47,14 @@ class FileWriter {
 
   /// Applies [deltas] to [targetFolder] and returns a [FileWriterResult].
   ///
-  /// Processes deltas sequentially. On a per-file error the failure is
+  /// Processes Delta sequentially. On a per-file error the failure is
   /// recorded in [FileWriterResult.errors] and processing continues —
   /// a single bad download does not abort the whole sync.
   Future<FileWriterResult> apply(
     Directory targetFolder,
-    List<FileDelta> deltas,
-  ) async {
+    List<FileDelta> deltas, {
+    FileProgressCallback? onFileProgress,
+  }) async {
     int added = 0;
     int updated = 0;
     int deleted = 0;
@@ -65,6 +70,7 @@ class FileWriter {
               delta.downloadUrl!,
             );
             added++;
+            await onFileProgress?.call(delta.relativePath, 'add');
           case DeltaType.update:
             await _writeFile(
               targetFolder,
@@ -72,14 +78,13 @@ class FileWriter {
               delta.downloadUrl!,
             );
             updated++;
+            await onFileProgress?.call(delta.relativePath, 'update');
           case DeltaType.delete:
             await _deleteFile(targetFolder, delta.relativePath);
             deleted++;
+            await onFileProgress?.call(delta.relativePath, 'delete');
         }
       } catch (e) {
-        // Catch both Exception and Error (e.g. ArgumentError from path guard).
-        // Record the failure and continue — a partial sync is better than an
-        // aborted one. The engine can decide what to do with errors.
         errors.add('${delta.relativePath}: $e');
       }
     }

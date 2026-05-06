@@ -1,12 +1,12 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:sync_engine/sync_engine.dart';
+import '../../core/services/sync_tracker.dart';
 import '../models/file_type_info.dart';
+import '../services/directory_watcher.dart';
 import '../services/file_explorer_service.dart';
 import '../services/trash_service.dart';
 import 'search_screen.dart';
@@ -43,6 +43,8 @@ class _MainScreenState extends State<MainScreen>
   final FileExplorerService _fileExplorerService = FileExplorerService();
   final TrashService _trashService = TrashService();
   final LinkService _linkService = LinkService();
+  final SyncTracker _syncTracker = SyncTracker();
+  late DirectoryWatcher _watcher;
   List<FileSystemEntity> _entries = [];
 
   @override
@@ -58,6 +60,8 @@ class _MainScreenState extends State<MainScreen>
     );
     _loadEntries();
     _initDeepLinks();
+    _watcher = DirectoryWatcher(path: widget.rootPath, onChanged: _loadEntries);
+    _watcher.start();
   }
 
   void _initDeepLinks() {
@@ -69,27 +73,123 @@ class _MainScreenState extends State<MainScreen>
     });
   }
 
-  void _openAddScreen(List<String> urls) {
-    showDialog(
+  Future<void> _openAddScreen(List<String> urls) async {
+    final selectedUrls = await showDialog<List<String>>(
       context: context,
-      builder: (_) => AddSourceDialog(
-        incomingUrls: urls,
-        rootPath: widget.rootPath,
-        onAdded: _loadEntries,
-      ),
+      builder: (_) => AddSourceDialog(incomingUrls: urls),
     );
+    if (selectedUrls != null && mounted) {
+      for (final url in selectedUrls) {
+        await _addSingleSource(url);
+      }
+    }
   }
 
-  void _addSource() {
-    showDialog(
+  Future<void> _addSource() async {
+    if (_isFabExpanded) {
+      setState(() {
+        _isFabExpanded = false;
+        _fabAnimController.reverse();
+      });
+    }
+    final selectedUrls = await showDialog<List<String>>(
       context: context,
-      builder: (_) =>
-          AddSourceDialog(rootPath: widget.rootPath, onAdded: _loadEntries),
+      builder: (_) => const AddSourceDialog(),
     );
+    if (selectedUrls != null && mounted) {
+      for (final url in selectedUrls) {
+        await _addSingleSource(url);
+      }
+    }
+  }
+
+  Future<void> _addSingleSource(String url) async {
+    final repoName = _getRepoName(url);
+    final repoPath = p.join(widget.rootPath, repoName);
+    var _firstProgress = true;
+
+    final trackerCallback = _syncTracker.start(repoPath);
+    final syncEngine = SyncEngine(
+      appFolder: Directory(widget.rootPath),
+      onProgress: (progress) {
+        if (!mounted) return;
+        if (_firstProgress) {
+          _firstProgress = false;
+          _loadEntries();
+        }
+        trackerCallback(progress);
+      },
+    );
+    final result = await syncEngine.addSource(url);
+    _syncTracker.stop();
+    _syncTracker.clearProgress(repoPath);
+    if (!mounted) return;
+    _loadEntries();
+    final color = Theme.of(context).colorScheme.inversePrimary;
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$repoName: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+          ),
+          backgroundColor: color,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$repoName: ${result.error}'),
+          backgroundColor: color,
+        ),
+      );
+    }
+  }
+
+  String _getRepoName(String url) {
+    try {
+      return getSourceFolderName(url);
+    } catch (_) {
+      return url;
+    }
+  }
+
+  String _syncProgressText(SyncProgress p) {
+    final pct = p.totalBytes != null
+        ? ((p.byteProgress ?? 0) * 100).toInt()
+        : (p.progress * 100).toInt();
+    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
+    return '$pct%$file';
+  }
+
+  Future<void> _syncSource(Directory sourceDir) async {
+    final sourcePath = sourceDir.path;
+    final trackerCallback = _syncTracker.start(sourcePath);
+    final syncEngine = SyncEngine(
+      appFolder: Directory(widget.rootPath),
+      onProgress: (progress) {
+        if (mounted) trackerCallback(progress);
+      },
+    );
+    final result = await syncEngine.syncSource(sourceDir);
+    _syncTracker.stop();
+    _syncTracker.clearProgress(sourcePath);
+    if (!mounted) return;
+    if (result.success) {
+      _loadEntries();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+          ),
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _watcher.stop();
     _fabAnimController.dispose();
     super.dispose();
   }
@@ -113,25 +213,57 @@ class _MainScreenState extends State<MainScreen>
     });
   }
 
-  Future<void> _createFolder() async {
+  void _createFolder() {
     _toggleFab();
-    final name = await _showTextInputDialog(
-      context,
-      'New Folder',
-      'Folder name',
-      'Create',
+    showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('New Folder'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Folder name'),
+            onSubmitted: (name) {
+              if (name.isNotEmpty) {
+                _fileExplorerService.createFolder(widget.rootPath, name);
+                _loadEntries();
+              }
+              Navigator.pop(ctx);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                if (name.isNotEmpty) {
+                  _fileExplorerService.createFolder(widget.rootPath, name);
+                  _loadEntries();
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
     );
-    if (name != null && name.isNotEmpty) {
-      _fileExplorerService.createFolder(widget.rootPath, name);
-      _loadEntries();
-    }
   }
 
-  Future<void> _uploadFolder() async {
+  Future<void> _uploadFiles() async {
     _toggleFab();
-    final path = await FilePicker.getDirectoryPath();
-    if (path != null) {
-      _fileExplorerService.copyFolderTo(widget.rootPath, path);
+    final result = await FilePicker.pickFiles(allowMultiple: true);
+    if (result != null && result.files.isNotEmpty) {
+      final paths = result.files
+          .where((pf) => pf.path != null)
+          .map((pf) => pf.path!)
+          .toList();
+      _fileExplorerService.uploadFilesToFolder(widget.rootPath, paths);
       _loadEntries();
     }
   }
@@ -219,7 +351,19 @@ class _MainScreenState extends State<MainScreen>
   }
 
   void _showItemMenu(FileSystemEntity entity) {
-    _showEntityMenu(context, entity, _fileExplorerService, _loadEntries);
+    _showEntityMenu(
+      context,
+      entity,
+      _fileExplorerService,
+      _loadEntries,
+      rootPath: widget.rootPath,
+      trashService: _trashService,
+      onSync: entity is Directory &&
+              _fileExplorerService.isSyncedSource(entity.path)
+          ? () => _syncSource(entity)
+          : null,
+      syncTracker: _syncTracker,
+    );
   }
 
   Future<void> _openSearch() async {
@@ -238,7 +382,11 @@ class _MainScreenState extends State<MainScreen>
           builder: (_) => _InsideFolderScreen(
             folderPath: selectedPath,
             rootPath: widget.rootPath,
-            isSynced: _fileExplorerService.isSyncedSource(selectedPath),
+            isInsideSource: _fileExplorerService.isInsideSource(
+              selectedPath,
+              widget.rootPath,
+            ),
+            syncTracker: _syncTracker,
           ),
         ),
       );
@@ -376,7 +524,7 @@ class _MainScreenState extends State<MainScreen>
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: OutlinedButton.icon(
                         onPressed: _selectedIndices.isEmpty
                             ? null
                             : _deleteSelected,
@@ -391,8 +539,10 @@ class _MainScreenState extends State<MainScreen>
           : null,
       body: Stack(
         children: [
-          _entries.isEmpty
-              ? Center(
+          RefreshIndicator(
+            onRefresh: () async => _loadEntries(),
+            child: _entries.isEmpty
+                ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -411,15 +561,19 @@ class _MainScreenState extends State<MainScreen>
                     ],
                   ),
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: _entries.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final entity = _entries[index];
-                    final isDir = entity is Directory;
-                    final name = p.basename(entity.path);
-                    final isSelected = _selectedIndices.contains(index);
+              : ValueListenableBuilder<Map<String, SyncProgress>>(
+                  valueListenable: _syncTracker.progress,
+                  builder: (context, syncProgress, _) {
+                    return ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      itemCount: _entries.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final entity = _entries[index];
+                        final isDir = entity is Directory;
+                        final name = p.basename(entity.path);
+                        final isSelected = _selectedIndices.contains(index);
+                        final progress = syncProgress[entity.path];
 
                     return Card(
                       child: InkWell(
@@ -434,8 +588,12 @@ class _MainScreenState extends State<MainScreen>
                                     builder: (_) => _InsideFolderScreen(
                                       folderPath: entity.path,
                                       rootPath: widget.rootPath,
-                                      isSynced: _fileExplorerService
-                                          .isSyncedSource(entity.path),
+                                      isInsideSource: _fileExplorerService
+                                          .isInsideSource(
+                                            entity.path,
+                                            widget.rootPath,
+                                          ),
+                                      syncTracker: _syncTracker,
                                     ),
                                   ),
                                 );
@@ -493,15 +651,27 @@ class _MainScreenState extends State<MainScreen>
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      _fileExplorerService.entitySubtitle(
-                                        entity,
+                                    if (progress != null) ...[
+                                      LinearProgressIndicator(
+                                        value: progress.progress,
+                                        minHeight: 3,
                                       ),
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _syncProgressText(progress),
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: colorScheme.primary,
+                                            ),
+                                      ),
+                                    ] else
+                                      Text(
+                                        _fileExplorerService.entitySubtitle(entity),
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -515,8 +685,11 @@ class _MainScreenState extends State<MainScreen>
                         ),
                       ),
                     );
-                  },
-                ),
+                    },
+                  );
+                },
+              ),
+          ),
           if (_isFabExpanded && !_isSelecting)
             GestureDetector(
               onTap: _toggleFab,
@@ -546,9 +719,9 @@ class _MainScreenState extends State<MainScreen>
                           ),
                           const SizedBox(height: 10),
                           _FabOption(
-                            label: 'Upload',
-                            icon: Icons.drive_folder_upload_outlined,
-                            onTap: _uploadFolder,
+                            label: 'Files',
+                            icon: Icons.upload_file_outlined,
+                            onTap: _uploadFiles,
                           ),
                           const SizedBox(height: 10),
                           _FabOption(
@@ -702,8 +875,8 @@ class _RegularFab extends StatelessWidget {
   final AnimationController fabAnimController;
   final Animation<double> fabAnimation;
   final VoidCallback onToggle;
-  final VoidCallback onUploadFiles;
-  final VoidCallback onUploadFolder;
+  final VoidCallback onAddFiles;
+  final VoidCallback onCreateFolder;
   final ColorScheme colorScheme;
 
   const _RegularFab({
@@ -711,8 +884,8 @@ class _RegularFab extends StatelessWidget {
     required this.fabAnimController,
     required this.fabAnimation,
     required this.onToggle,
-    required this.onUploadFiles,
-    required this.onUploadFolder,
+    required this.onAddFiles,
+    required this.onCreateFolder,
     required this.colorScheme,
   });
 
@@ -732,15 +905,15 @@ class _RegularFab extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _FabOption(
-                  label: 'Upload folder',
-                  icon: Icons.drive_folder_upload_outlined,
-                  onTap: onUploadFolder,
+                  label: 'Files',
+                  icon: Icons.upload_file_outlined,
+                  onTap: onAddFiles,
                 ),
                 const SizedBox(height: 10),
                 _FabOption(
-                  label: 'Upload files',
-                  icon: Icons.upload_file_outlined,
-                  onTap: onUploadFiles,
+                  label: 'Folder',
+                  icon: Icons.create_new_folder_outlined,
+                  onTap: onCreateFolder,
                 ),
                 const SizedBox(height: 14),
               ],
@@ -776,12 +949,14 @@ class _RegularFab extends StatelessWidget {
 class _InsideFolderScreen extends StatefulWidget {
   final String folderPath;
   final String rootPath;
-  final bool isSynced;
+  final bool isInsideSource;
+  final SyncTracker? syncTracker;
 
   const _InsideFolderScreen({
     required this.folderPath,
     required this.rootPath,
-    this.isSynced = false,
+    this.isInsideSource = false,
+    this.syncTracker,
   });
 
   @override
@@ -792,6 +967,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     with SingleTickerProviderStateMixin {
   final FileExplorerService _fileExplorerService = FileExplorerService();
   final TrashService _trashService = TrashService();
+  late DirectoryWatcher _watcher;
   List<FileSystemEntity> _files = [];
   final Set<int> _selectedIndices = {};
   bool _isSelecting = false;
@@ -812,10 +988,13 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
       curve: Curves.easeOut,
     );
     _loadFiles();
+    _watcher = DirectoryWatcher(path: widget.folderPath, onChanged: _loadFiles);
+    _watcher.start();
   }
 
   @override
   void dispose() {
+    _watcher.stop();
     _fabAnimController.dispose();
     super.dispose();
   }
@@ -837,6 +1016,48 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     });
   }
 
+  void _createFolder() {
+    _toggleFab();
+    showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('New Folder'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Folder name'),
+            onSubmitted: (name) {
+              if (name.isNotEmpty) {
+                _fileExplorerService.createFolder(widget.folderPath, name);
+                _loadFiles();
+              }
+              Navigator.pop(ctx);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                if (name.isNotEmpty) {
+                  _fileExplorerService.createFolder(widget.folderPath, name);
+                  _loadFiles();
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _uploadFiles() async {
     _toggleFab();
     final result = await FilePicker.pickFiles(allowMultiple: true);
@@ -850,95 +1071,36 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     }
   }
 
-  Future<void> _uploadFolder() async {
-    _toggleFab();
-    final path = await FilePicker.getDirectoryPath();
-    if (path != null) {
-      _fileExplorerService.copyFolderTo(widget.folderPath, path);
-      _loadFiles();
-    }
-  }
-
   Future<void> _syncSource() async {
     setState(() => _isSyncing = true);
-    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
+    final sourcePath = widget.folderPath;
+
+    final trackerCallback = widget.syncTracker?.start(sourcePath) ?? _noopCallback;
+    final syncEngine = SyncEngine(
+      appFolder: Directory(widget.rootPath),
+      onProgress: (progress) {
+        if (mounted) trackerCallback(progress);
+      },
+    );
     final result = await syncEngine.syncSource(Directory(widget.folderPath));
-    setState(() => _isSyncing = false);
+    widget.syncTracker?.stop();
+    widget.syncTracker?.clearProgress(sourcePath);
     if (!mounted) return;
+    setState(() => _isSyncing = false);
     if (result.success) {
+      _loadFiles();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
       );
-      _loadFiles();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sync failed: ${result.error}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-
-    void _showPropertiesDialog(
-      BuildContext context,
-      FileSystemEntity entity,
-    ) async {
-      final sourceDir = Directory(entity.path);
-      final store = SourceStore();
-
-      try {
-        final config = await store.read(sourceDir);
-        final json = config.toJson();
-
-        final content = json.entries
-            .map((e) => '${e.key}: ${e.value ?? "-"}')
-            .join('\n');
-
-        if (!context.mounted) return;
-
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Properties'),
-            content: SingleChildScrollView(
-              child: Text(
-                content,
-                style: const TextStyle(fontFamily: 'monospace'),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  final jsonStr = const JsonEncoder.withIndent(
-                    '  ',
-                  ).convert(json);
-                  Clipboard.setData(ClipboardData(text: jsonStr));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied to clipboard')),
-                  );
-                },
-                child: const Text('Copy JSON'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        );
-      } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     }
   }
+
+  void _noopCallback(SyncProgress _) {}
 
   void _toggleSelect(int index) {
     setState(() {
@@ -971,7 +1133,15 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
   }
 
   void _showFileMenu(FileSystemEntity entity) {
-    _showEntityMenu(context, entity, _fileExplorerService, _loadFiles);
+    _showEntityMenu(
+      context,
+      entity,
+      _fileExplorerService,
+      _loadFiles,
+      rootPath: widget.rootPath,
+      trashService: _trashService,
+      syncTracker: widget.syncTracker,
+    );
   }
 
   void _deleteSelected() {
@@ -1003,6 +1173,14 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     );
   }
 
+  String _syncProgressText(SyncProgress p) {
+    final pct = p.totalBytes != null
+        ? ((p.byteProgress ?? 0) * 100).toInt()
+        : (p.progress * 100).toInt();
+    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
+    return '$pct%$file';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1016,9 +1194,28 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               ? _cancelSelection
               : () => Navigator.pop(context),
         ),
-        title: _isSelecting
-            ? Text('${_selectedIndices.length} selected')
-            : Text(p.basename(widget.folderPath)),
+        title: ValueListenableBuilder<Map<String, SyncProgress>>(
+          valueListenable: widget.syncTracker?.progress ?? ValueNotifier({}),
+          builder: (context, syncProgress, _) {
+            final progress = syncProgress[widget.folderPath];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_isSelecting
+                    ? '${_selectedIndices.length} selected'
+                    : p.basename(widget.folderPath)),
+                if (progress != null && !_isSelecting)
+                  Text(
+                    _syncProgressText(progress),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.primary,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
         actions: _isSelecting
             ? [
                 IconButton(
@@ -1032,11 +1229,11 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               ]
             : null,
       ),
-      bottomNavigationBar: _isSelecting
+      bottomNavigationBar: _isSelecting && !widget.isInsideSource
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: _selectedIndices.isEmpty ? null : _deleteSelected,
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('Move to trash'),
@@ -1046,31 +1243,33 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
           : null,
       body: Stack(
         children: [
-          _files.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.upload_file,
-                        color: colorScheme.onSurfaceVariant,
-                        size: 64,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No files yet — tap + to upload',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+          RefreshIndicator(
+            onRefresh: () async => _loadFiles(),
+            child: _files.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.upload_file,
                           color: colorScheme.onSurfaceVariant,
+                          size: 64,
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: _files.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
+                        const SizedBox(height: 16),
+                        Text(
+                          'No files yet — tap + to upload',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                    itemCount: _files.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
                     final entity = _files[index];
                     final isDir = entity is Directory;
                     final name = p.basename(entity.path);
@@ -1102,25 +1301,33 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                     builder: (_) => _InsideFolderScreen(
                                       folderPath: entity.path,
                                       rootPath: widget.rootPath,
+                                      isInsideSource: widget.isInsideSource ||
+                                          _fileExplorerService.isInsideSource(
+                                            entity.path,
+                                            widget.rootPath,
+                                          ),
+                                      syncTracker: widget.syncTracker,
                                     ),
                                   ),
                                 );
                                 _loadFiles();
                               }
                             : () => OpenFile.open(entity.path),
-                        onLongPress: () {
-                          if (!_isSelecting) {
-                            setState(() {
-                              _isSelecting = true;
-                              _selectedIndices.add(index);
-                            });
-                          }
-                        },
+                        onLongPress: widget.isInsideSource
+                            ? null
+                            : () {
+                                if (!_isSelecting) {
+                                  setState(() {
+                                    _isSelecting = true;
+                                    _selectedIndices.add(index);
+                                  });
+                                }
+                              },
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
-                              if (_isSelecting) ...[
+                              if (_isSelecting && !widget.isInsideSource) ...[
                                 Icon(
                                   isSelected
                                       ? Icons.check_circle
@@ -1185,19 +1392,20 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                     );
                   },
                 ),
+          ),
           if (!_isSelecting)
             Positioned(
               right: 16,
               bottom: 40,
-              child: widget.isSynced
+              child: widget.isInsideSource
                   ? _SyncedFab(isSyncing: _isSyncing, onSync: _syncSource)
                   : _RegularFab(
                       isFabExpanded: _isFabExpanded,
                       fabAnimController: _fabAnimController,
                       fabAnimation: _fabAnimation,
                       onToggle: _toggleFab,
-                      onUploadFiles: _uploadFiles,
-                      onUploadFolder: _uploadFolder,
+                      onAddFiles: _uploadFiles,
+                      onCreateFolder: _createFolder,
                       colorScheme: colorScheme,
                     ),
             ),
@@ -1241,8 +1449,13 @@ void _showEntityMenu(
   BuildContext context,
   FileSystemEntity entity,
   FileExplorerService service,
-  VoidCallback onRefresh,
-) {
+  VoidCallback onRefresh, {
+  required String rootPath,
+  required TrashService trashService,
+  Future<void> Function()? onSync,
+  SyncTracker? syncTracker,
+}) {
+  final insideSource = service.isInsideSource(entity.path, rootPath);
   final isSource = entity is Directory && service.isSyncedSource(entity.path);
   final linkService = LinkService();
   final sourceUrl = isSource ? service.getSourceUrl(entity.path) : null;
@@ -1253,24 +1466,66 @@ void _showEntityMenu(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ListTile(
-            leading: const Icon(Icons.edit_outlined),
-            title: const Text('Rename'),
-            onTap: () async {
-              Navigator.pop(ctx);
-              final oldName = p.basename(entity.path);
-              final newName = await _showTextInputDialog(
-                context,
-                'Rename',
-                oldName,
-                'Rename',
-              );
-              if (newName != null && newName.isNotEmpty && newName != oldName) {
-                service.renameEntity(entity, newName);
-                onRefresh();
-              }
-            },
-          ),
+          if (!insideSource || isSource)
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final oldName = p.basename(entity.path);
+                final newName = await _showTextInputDialog(
+                  context,
+                  'Rename',
+                  oldName,
+                  'Rename',
+                );
+                if (newName != null &&
+                    newName.isNotEmpty &&
+                    newName != oldName) {
+                  service.renameEntity(entity, newName);
+                  onRefresh();
+                }
+              },
+            ),
+          if (!insideSource || isSource)
+            ListTile(
+              leading: const Icon(Icons.delete_outlined),
+              title: const Text('Delete'),
+              onTap: () {
+                Navigator.pop(ctx);
+                final name = p.basename(entity.path);
+                showDialog(
+                  context: context,
+                  builder: (dialogCtx) => AlertDialog(
+                    title: const Text('Move to Trash'),
+                    content: Text('$name will be deleted after 30 days.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(dialogCtx);
+                          trashService.moveToTrash(rootPath, entity);
+                          onRefresh();
+                        },
+                        child: const Text('Move to trash'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          if (onSync != null)
+            ListTile(
+              leading: const Icon(Icons.sync),
+              title: const Text('Sync'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onSync();
+              },
+            ),
           if (sourceUrl != null)
             ListTile(
               leading: const Icon(Icons.share),
@@ -1280,15 +1535,14 @@ void _showEntityMenu(
                 linkService.shareSheet([sourceUrl]);
               },
             ),
-          if (isSource)
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('Properties'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showPropertiesDialog(context, entity);
-              },
-            ),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Properties'),
+            onTap: () {
+              Navigator.pop(ctx);
+              _showPropertiesDialog(context, entity, service, syncTracker);
+            },
+          ),
         ],
       ),
     ),
@@ -1298,49 +1552,198 @@ void _showEntityMenu(
 void _showPropertiesDialog(
   BuildContext context,
   FileSystemEntity entity,
-) async {
-  final sourceDir = Directory(entity.path);
-  final store = SourceStore();
+  FileExplorerService service,
+  SyncTracker? syncTracker,
+) {
+  showDialog(
+    context: context,
+    builder: (ctx) => _PropertiesDialog(
+      entity: entity,
+      service: service,
+      syncTracker: syncTracker,
+    ),
+  );
+}
 
-  try {
-    final config = await store.read(sourceDir);
-    final json = config.toJson();
+class _PropertiesDialog extends StatefulWidget {
+  final FileSystemEntity entity;
+  final FileExplorerService service;
+  final SyncTracker? syncTracker;
 
-    final content = json.entries
-        .map((e) => '${e.key}: ${e.value ?? "-"}')
-        .join('\n');
+  const _PropertiesDialog({
+    required this.entity,
+    required this.service,
+    this.syncTracker,
+  });
 
-    if (!context.mounted) return;
+  @override
+  State<_PropertiesDialog> createState() => _PropertiesDialogState();
+}
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Properties'),
-        content: SingleChildScrollView(
-          child: Text(content, style: const TextStyle(fontFamily: 'monospace')),
+class _PropertiesDialogState extends State<_PropertiesDialog> {
+  int? _size;
+  Map<String, dynamic>? _config;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSize();
+    if (widget.entity is Directory &&
+        widget.service.isSyncedSource(widget.entity.path)) {
+      _loadConfig();
+    }
+  }
+
+  Future<void> _loadSize() async {
+    final size = widget.entity is Directory
+        ? await widget.service.getFolderSize(widget.entity.path)
+        : (widget.entity as File).lengthSync();
+    if (mounted) setState(() => _size = size);
+  }
+
+  Future<void> _loadConfig() async {
+    try {
+      final store = SourceStore();
+      final config = await store.read(Directory(widget.entity.path));
+      if (mounted) setState(() => _config = config.toJson());
+    } catch (_) {}
+  }
+
+  String _syncProgressText(SyncProgress p) {
+    final pct = p.totalBytes != null
+        ? ((p.byteProgress ?? 0) * 100).toInt()
+        : (p.progress * 100).toInt();
+    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
+    return '$pct%$file';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDir = widget.entity is Directory;
+    final name = p.basename(widget.entity.path);
+    final stat = widget.entity.statSync();
+    final modified = stat.modified;
+
+    final rows = <Widget>[
+      _propRow('Name', name),
+      _propRow('Type', isDir ? 'Folder' : FileTypeInfo.classify(name).label),
+      _propRow(
+        'Size',
+        _size == null ? '...' : widget.service.formatSize(_size!),
+      ),
+      _propRow('Location', widget.entity.path),
+      _propRow(
+        'Modified',
+        '${modified.year}-${modified.month.toString().padLeft(2, '0')}-${modified.day.toString().padLeft(2, '0')} ${modified.hour.toString().padLeft(2, '0')}:${modified.minute.toString().padLeft(2, '0')}',
+      ),
+    ];
+
+    return AlertDialog(
+      title: const Text('Properties'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.syncTracker != null && isDir)
+              ValueListenableBuilder<Map<String, SyncProgress>>(
+                valueListenable: widget.syncTracker!.progress,
+                builder: (context, syncProgress, _) {
+                  final progress = syncProgress[widget.entity.path];
+                  if (progress == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(
+                          value: progress.progress,
+                          minHeight: 4,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _syncProgressText(progress),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ...rows,
+            if (_config != null) ...[
+              const Divider(height: 24),
+              _propRow('Type', _config!['type']?.toString() ?? '-'),
+              _propRow('URL', _config!['url']?.toString() ?? '-'),
+              _propRow(
+                'Branch',
+                _config!['default_branch']?.toString() ?? '-',
+              ),
+              _propRow(
+                'Status',
+                _config!['sync_status']?.toString() ?? '-',
+              ),
+              _propRow(
+                'Checkpoint',
+                _config!['checkpoint']?.toString() ?? '-',
+              ),
+              if (_config!['last_synced_at'] != null)
+                _propRow(
+                  'Last Synced',
+                  _formatIsoDate(_config!['last_synced_at'] as String),
+                ),
+            ],
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              final jsonStr = const JsonEncoder.withIndent('  ').convert(json);
-              Clipboard.setData(ClipboardData(text: jsonStr));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Copied to clipboard')),
-              );
-            },
-            child: const Text('Copy JSON'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  Widget _propRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
-  } catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Error: $e')));
+  }
+
+  String _formatIsoDate(String isoDate) {
+    try {
+      final dt = DateTime.parse(isoDate).toLocal();
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return isoDate;
+    }
   }
 }
