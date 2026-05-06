@@ -31,20 +31,22 @@ android {
         versionName = flutter.versionName
     }
 
-    // signingConfigs {
-    //     create("release") {
-    //         keyAlias      = System.getenv("KEY_ALIAS")
-    //         keyPassword   = System.getenv("KEY_PASSWORD")
-    //         storeFile     = file(System.getenv("KEYSTORE_PATH"))
-    //         storePassword = System.getenv("KEYSTORE_PASSWORD")
-    //     }
-    // }
-    // buildTypes {
-    //
-    //     release {
-    //         signingConfig = signingConfigs.getByName("release")
-    //     }
-    // }
+    signingConfigs {
+        create("release") {
+            keyAlias      = System.getenv("KEY_ALIAS") ?: ""
+            keyPassword   = System.getenv("KEY_PASSWORD") ?: ""
+            storeFile     = System.getenv("KEYSTORE_PATH")?.let { file(it) }
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+        }
+    }
+
+    buildTypes {
+        release {
+            if (System.getenv("KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
 }
 
 flutter {
