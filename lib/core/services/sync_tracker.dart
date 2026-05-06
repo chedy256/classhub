@@ -10,19 +10,26 @@ class SyncTracker {
   final SyncForegroundService _nativeService = SyncForegroundService();
   Timer? _throttleTimer;
   SyncProgress? _latestProgress;
-  String? _activeSourcePath;
+  String? _nativeSourcePath;
   bool _isTracking = false;
 
   final ValueNotifier<Map<String, SyncProgress>> progress = ValueNotifier({});
 
   SyncProgressCallback start(String sourcePath) {
-    _activeSourcePath = sourcePath;
     _isTracking = true;
     _latestProgress = null;
-    progress.value = {};
+    _nativeSourcePath = sourcePath;
     final sourceName = p.basename(sourcePath);
     _nativeService.start(sourceName, 0);
-    return _onProgress;
+
+    return (SyncProgress p) {
+      setProgress(sourcePath, p);
+      _latestProgress = p;
+      _throttleTimer?.cancel();
+      _throttleTimer = Timer(const Duration(seconds: 1), () {
+        _flushProgress();
+      });
+    };
   }
 
   void stop() {
@@ -48,20 +55,6 @@ class SyncTracker {
 
   void clearAll() {
     progress.value = {};
-  }
-
-  void _onProgress(SyncProgress progress) {
-    _latestProgress = progress;
-
-    final sourcePath = _activeSourcePath;
-    if (sourcePath != null) {
-      setProgress(sourcePath, progress);
-    }
-
-    _throttleTimer?.cancel();
-    _throttleTimer = Timer(const Duration(seconds: 1), () {
-      _flushProgress();
-    });
   }
 
   void _flushProgress() {
