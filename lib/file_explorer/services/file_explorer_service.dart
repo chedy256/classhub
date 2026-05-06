@@ -1,8 +1,10 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:sync_engine/sync_engine.dart';
 
 class FileExplorerService {
+  final SourceStore _sourceStore = SourceStore();
+
   List<FileSystemEntity> loadEntries(String rootPath) {
     final dir = Directory(rootPath);
     if (!dir.existsSync()) {
@@ -25,7 +27,22 @@ class FileExplorerService {
   }
 
   bool isSyncedSource(String path) {
-    return File(p.join(path, '.source', 'source.json')).existsSync();
+    return _sourceStore.existsSync(Directory(path));
+  }
+
+  SourceConfig? getSourceConfig(String path) {
+    return _sourceStore.readSync(Directory(path));
+  }
+
+  String? formatLastSynced(DateTime? dt) {
+    if (dt == null) return null;
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   bool isInsideSource(String path, String rootPath) {
@@ -39,19 +56,8 @@ class FileExplorerService {
   }
 
   String? getSourceUrl(String path) {
-    final sourceFile = File(p.join(path, '.source', 'source.json'));
-    if (!sourceFile.existsSync()) return null;
-    try {
-      final json = sourceFile.readAsStringSync();
-      final data = _parseJson(json);
-      return data['url'] as String?;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  dynamic _parseJson(String json) {
-    return const JsonDecoder().convert(json);
+    final config = getSourceConfig(path);
+    return config?.url;
   }
 
   List<Directory> getSources(String rootPath) {

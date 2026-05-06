@@ -18,6 +18,8 @@ import 'package:classhub/share/screens/add_screen.dart';
 import 'package:classhub/share/services/deep_link_service.dart';
 import '../../core/services/update_checker.dart';
 import '../../core/services/classhub_storage_service.dart';
+import '../models/source_type_icon.dart';
+import '../services/sync_utils.dart';
 
 class MainScreen extends StatefulWidget {
   final String rootPath;
@@ -174,11 +176,9 @@ class _MainScreenState extends State<MainScreen>
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$repoName: ${result.error}'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$repoName: ${result.error}')));
     }
   }
 
@@ -190,38 +190,23 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  String _syncProgressText(SyncProgress p) {
-    final pct = p.totalBytes != null
-        ? ((p.byteProgress ?? 0) * 100).toInt()
-        : (p.progress * 100).toInt();
-    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
-    return '$pct%$file';
-  }
-
   Future<void> _syncSource(Directory sourceDir) async {
-    final sourcePath = sourceDir.path;
-    final trackerCallback = _syncTracker.start(sourcePath);
-    final syncEngine = SyncEngine(
-      appFolder: Directory(widget.rootPath),
-      githubToken: await ClasshubStorageService.getGithubToken(),
-      onProgress: (progress) {
-        if (mounted) trackerCallback(progress);
+    await performSync(
+      sourceDir: sourceDir,
+      rootPath: widget.rootPath,
+      syncTracker: _syncTracker,
+      context: context,
+      onAfterSync: _loadEntries,
+      onSuccess: (result) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Synced ${p.basename(sourceDir.path)}: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+            ),
+          ),
+        );
       },
     );
-    final result = await syncEngine.syncSource(sourceDir);
-    _syncTracker.stop();
-    _syncTracker.clearProgress(sourcePath);
-    if (!mounted) return;
-    if (result.success) {
-      _loadEntries();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Synced ${p.basename(sourceDir.path)}: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
-          ),
-        ),
-      );
-    }
   }
 
   @override
@@ -630,6 +615,11 @@ class _MainScreenState extends State<MainScreen>
                           final name = p.basename(entity.path);
                           final isSelected = _selectedIndices.contains(index);
                           final progress = syncProgress[entity.path];
+                          final sourceConfig = isDir
+                              ? _fileExplorerService.getSourceConfig(
+                                  entity.path,
+                                )
+                              : null;
 
                           return Card(
                             child: InkWell(
@@ -686,10 +676,8 @@ class _MainScreenState extends State<MainScreen>
                                         color: colorScheme.primaryContainer,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: Icon(
-                                        isDir
-                                            ? Icons.folder_outlined
-                                            : Icons.description_outlined,
+                                      child: (sourceConfig?.type).iconWidget(
+                                        size: 24,
                                         color: colorScheme.onPrimaryContainer,
                                       ),
                                     ),
@@ -715,13 +703,27 @@ class _MainScreenState extends State<MainScreen>
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              _syncProgressText(progress),
+                                              syncProgressText(progress),
                                               style: theme.textTheme.bodySmall
                                                   ?.copyWith(
                                                     color: colorScheme.primary,
                                                   ),
                                             ),
-                                          ] else
+                                          ] else if (sourceConfig != null)
+                                            Text(
+                                              _fileExplorerService
+                                                      .formatLastSynced(
+                                                        sourceConfig
+                                                            .lastSyncedAt,
+                                                      ) ??
+                                                  'Not synced',
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                            )
+                                          else
                                             Text(
                                               _fileExplorerService
                                                   .entitySubtitle(entity),
@@ -1152,35 +1154,27 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
 
   Future<void> _syncSource() async {
     setState(() => _isSyncing = true);
-    final sourcePath = widget.folderPath;
-
-    final trackerCallback =
-        widget.syncTracker?.start(sourcePath) ?? _noopCallback;
-    final syncEngine = SyncEngine(
-      appFolder: Directory(widget.rootPath),
-      githubToken: await ClasshubStorageService.getGithubToken(),
-      onProgress: (progress) {
-        if (mounted) trackerCallback(progress);
+    await performSync(
+      sourceDir: Directory(widget.folderPath),
+      rootPath: widget.rootPath,
+      syncTracker: widget.syncTracker,
+      context: context,
+      onBeforeSync: () {},
+      onAfterSync: () {
+        if (mounted) setState(() => _isSyncing = false);
+        _loadFiles();
+      },
+      onSuccess: (result) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Synced ${p.basename(widget.folderPath)}: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+            ),
+          ),
+        );
       },
     );
-    final result = await syncEngine.syncSource(Directory(widget.folderPath));
-    widget.syncTracker?.stop();
-    widget.syncTracker?.clearProgress(sourcePath);
-    if (!mounted) return;
-    setState(() => _isSyncing = false);
-    if (result.success) {
-      _loadFiles();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Synced ${p.basename(widget.folderPath)}: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
-          ),
-        ),
-      );
-    }
   }
-
-  void _noopCallback(SyncProgress _) {}
 
   void _toggleSelect(int index) {
     setState(() {
@@ -1253,14 +1247,6 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     );
   }
 
-  String _syncProgressText(SyncProgress p) {
-    final pct = p.totalBytes != null
-        ? ((p.byteProgress ?? 0) * 100).toInt()
-        : (p.progress * 100).toInt();
-    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
-    return '$pct%$file';
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1278,20 +1264,47 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
           valueListenable: widget.syncTracker?.progress ?? ValueNotifier({}),
           builder: (context, syncProgress, _) {
             final progress = syncProgress[widget.folderPath];
+            final sourceConfig = _fileExplorerService.getSourceConfig(
+              widget.folderPath,
+            );
+            final lastSynced = _fileExplorerService.formatLastSynced(
+              sourceConfig?.lastSyncedAt,
+            );
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _isSelecting
-                      ? '${_selectedIndices.length} selected'
-                      : p.basename(widget.folderPath),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isSelecting
+                          ? '${_selectedIndices.length} selected'
+                          : p.basename(widget.folderPath),
+                    ),
+                    if (sourceConfig != null && !_isSelecting) ...[
+                      const SizedBox(width: 6),
+                      sourceConfig.type.iconWidget(
+                        size: 18,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ],
                 ),
                 if (progress != null && !_isSelecting)
                   Text(
-                    _syncProgressText(progress),
+                    syncProgressText(progress),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.primary,
+                    ),
+                  )
+                else if (lastSynced != null &&
+                    sourceConfig != null &&
+                    !_isSelecting)
+                  Text(
+                    'Synced $lastSynced',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
               ],
@@ -1693,14 +1706,6 @@ class _PropertiesDialogState extends State<_PropertiesDialog> {
     } catch (_) {}
   }
 
-  String _syncProgressText(SyncProgress p) {
-    final pct = p.totalBytes != null
-        ? ((p.byteProgress ?? 0) * 100).toInt()
-        : (p.progress * 100).toInt();
-    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
-    return '$pct%$file';
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDir = widget.entity is Directory;
@@ -1746,7 +1751,7 @@ class _PropertiesDialogState extends State<_PropertiesDialog> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _syncProgressText(progress),
+                          syncProgressText(progress),
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: Theme.of(context).colorScheme.primary,

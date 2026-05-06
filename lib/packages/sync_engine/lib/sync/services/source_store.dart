@@ -12,6 +12,24 @@ class SourceStore {
     return File('${sourceFolder.path}/$_sourceDirName/$_sourceFileName');
   }
 
+  /// Checks if source.json exists in the given source folder synchronously.
+  bool existsSync(Directory sourceFolder) {
+    return _sourceFile(sourceFolder).existsSync();
+  }
+
+  /// Reads source.json from the given source folder synchronously.
+  /// Returns null if the file doesn't exist or is malformed.
+  SourceConfig? readSync(Directory sourceFolder) {
+    try {
+      final file = _sourceFile(sourceFolder);
+      if (!file.existsSync()) return null;
+      final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      return SourceConfig.fromJson(json);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Reads source.json from the given source folder.
   /// Throws if the file doesn't exist or is malformed.
   Future<SourceConfig> read(Directory sourceFolder) async {
