@@ -8,6 +8,30 @@ class LockService {
     return '${parentDir.path}/.$sourceFolderName$_lockSuffix';
   }
 
+  bool hasStale(Directory parentDir, String sourceFolderName, Duration staleness) {
+    final lockFile = File(_lockPath(parentDir, sourceFolderName));
+    if (!lockFile.existsSync()) return false;
+    try {
+      final json = jsonDecode(lockFile.readAsStringSync()) as Map<String, dynamic>;
+      final lockedAt = DateTime.parse(json['locked_at'] as String);
+      final age = DateTime.now().difference(lockedAt);
+      return age >= staleness;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  bool exists(Directory parentDir, String sourceFolderName) {
+    return File(_lockPath(parentDir, sourceFolderName)).existsSync();
+  }
+
+  Future<void> deleteLock(Directory parentDir, String sourceFolderName) async {
+    final lockFile = File(_lockPath(parentDir, sourceFolderName));
+    if (await lockFile.exists()) {
+      await lockFile.delete();
+    }
+  }
+
   bool tryAcquire(Directory parentDir, String sourceFolderName, Duration staleness) {
     final lockFile = File(_lockPath(parentDir, sourceFolderName));
     if (lockFile.existsSync()) {

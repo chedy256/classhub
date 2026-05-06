@@ -43,4 +43,13 @@ class SyncQueueService {
     final queueFile = File('${tempFolder.path}/$_queueFileName');
     return await queueFile.exists();
   }
+
+  /// Checks if a pending queue exists (has unfinished deltas).
+  Future<bool> hasPending(Directory tempFolder) async {
+    final queue = await read(tempFolder);
+    if (queue == null) return false;
+    if (queue.completedCount == queue.totalDeltas) return false;
+    if (queue.completedCount == 0 && queue.totalDeltas == 0) return false;
+    return true;
+  }
 }
