@@ -59,13 +59,13 @@ class GithubSyncer implements SourceSyncer {
     final entries = treeData['tree'] as List<dynamic>;
     final deltas = entries.where((e) => e['type'] == 'blob').map((e) {
       final path = e['path'] as String;
+      final size = e['size'] as int?;
       return FileDelta(
         relativePath: path,
         type: DeltaType.add,
-        // raw.githubusercontent.com serves file content directly,
-        // no API rate limit, no auth needed for public repos
         downloadUrl:
             'https://raw.githubusercontent.com/$owner/$repo/$branch/$path',
+        size: size,
       );
     }).toList();
 
