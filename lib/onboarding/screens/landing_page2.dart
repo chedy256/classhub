@@ -25,22 +25,16 @@ class LandingPage2 extends StatelessWidget {
                   letterSpacing: -0.5,
                 ),
               ),
-              const Spacer(flex: 1,),
+              const Spacer(flex: 1),
               _FeatureCard(
-                title: 'Local Repository Sync',
-                description: 'Manage files with Git-like efficiency',
-                icon: Icons.account_tree_outlined,
-              ),
-              const SizedBox(height: 16),
-              _FeatureCard(
-                title: 'Instant Indexing',
-                description: 'Search across all your local semesters.',
-                icon: Icons.speed_outlined,
+                title: 'Simple by Design',
+                description: 'Minimal and intuitive.',
+                icon: Icons.check_circle_outline,
               ),
               const SizedBox(height: 16),
               _FeatureCard(
                 title: 'Offline First',
-                description: 'Works entirely on your machine.',
+                description: 'Works entirely on your device.',
                 icon: Icons.cloud_off_outlined,
               ),
               const SizedBox(height: 16),
@@ -49,7 +43,13 @@ class LandingPage2 extends StatelessWidget {
                 description: 'Your data stays where it belongs.',
                 icon: Icons.lock_outline_rounded,
               ),
-              const Spacer(flex: 3,),
+              const SizedBox(height: 16),
+              _FeatureCard(
+                title: 'Open Source',
+                description: 'Free and open source software.',
+                icon: Icons.code,
+              ),
+              const Spacer(flex: 3),
               FilledButton(
                 onPressed: () => Navigator.pushReplacement(
                   context,
@@ -57,7 +57,7 @@ class LandingPage2 extends StatelessWidget {
                 ),
                 child: const Text('Get Started'),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Text(
                 '© 2026 CLASSHUB (ISIMM EDITION)',
                 textAlign: TextAlign.center,
@@ -67,7 +67,7 @@ class LandingPage2 extends StatelessWidget {
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 48),
             ],
           ),
         ),
@@ -103,7 +103,11 @@ class _FeatureCard extends StatelessWidget {
                 color: colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: colorScheme.onPrimaryContainer, size: 20),
+              child: Icon(
+                icon,
+                color: colorScheme.onPrimaryContainer,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -112,7 +116,12 @@ class _FeatureCard extends StatelessWidget {
                 children: [
                   Text(title, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  Text(description, style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+                  Text(
+                    description,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -122,3 +131,4 @@ class _FeatureCard extends StatelessWidget {
     );
   }
 }
+

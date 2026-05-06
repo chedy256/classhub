@@ -49,7 +49,10 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
   }
 
   Future<void> _pickFolder() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     final path = await OnboardingService.pickFolder();
     if (!mounted) return;
@@ -70,7 +73,10 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
   }
 
   Future<void> _completeSetup() async {
-    setState(() { _isCompleting = true; _error = null; });
+    setState(() {
+      _isCompleting = true;
+      _error = null;
+    });
 
     final hasPermission = await StoragePermissionService.requestPermission();
     if (!hasPermission) {
@@ -99,11 +105,23 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.rocket_launch_outlined, color: colorScheme.primary, size: 48),
+            Icon(
+              Icons.rocket_launch_outlined,
+              color: colorScheme.primary,
+              size: 48,
+            ),
             const SizedBox(height: 24),
-            Text("Let's Go!", style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              "Let's Go!",
+              style: theme.textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text('Choose a folder for ClassHub to store your files.', style: theme.textTheme.bodyLarge),
+            Text(
+              'Choose a folder for ClassHub to store your files.',
+              style: theme.textTheme.bodyLarge,
+            ),
             const SizedBox(height: 40),
             Card(
               child: Padding(
@@ -126,9 +144,18 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Icon(Icons.error_outline, color: colorScheme.error, size: 16),
+                          Icon(
+                            Icons.error_outline,
+                            color: colorScheme.error,
+                            size: 16,
+                          ),
                           const SizedBox(width: 8),
-                          Text(_error!, style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.error)),
+                          Text(
+                            _error!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.error,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -139,11 +166,18 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: FilledButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: _isLoading ? null : _pickFolder,
                 icon: _isLoading
-                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(hasFolder ? Icons.check : Icons.folder_open_outlined, size: 18),
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        hasFolder ? Icons.check : Icons.folder_open_outlined,
+                        size: 18,
+                      ),
                 label: Text(hasFolder ? 'Change Folder' : 'Select Folder'),
               ),
             ),
@@ -151,15 +185,19 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: hasFolder && !_isCompleting ? () => _completeSetup() : null,
+                onPressed: hasFolder && !_isCompleting
+                    ? () => _completeSetup()
+                    : null,
                 child: _isCompleting
                     ? const SizedBox(
-                        height: 18, width: 18,
+                        height: 18,
+                        width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Text('Finish'),
               ),
             ),
+            const SizedBox(height: 88),
           ],
         ),
       ),

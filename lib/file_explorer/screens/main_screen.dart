@@ -444,7 +444,7 @@ class _MainScreenState extends State<MainScreen>
                 },
               ),
               _DrawerItem(
-                icon: Icons.favorite,
+                icon: Icons.support,
                 label: 'Support',
                 onTap: () {
                   Navigator.pop(context);

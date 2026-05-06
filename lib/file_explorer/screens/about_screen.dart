@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/version.dart';
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
@@ -28,7 +29,7 @@ class AboutScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Version 1.0.0',
+            'Version $appVersion',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -41,6 +42,13 @@ class AboutScreen extends StatelessWidget {
             subtitle: const Text('GitHub repository'),
             trailing: const Icon(Icons.open_in_new),
             onTap: () => _openUrl('https://github.com/titanknis/classhub'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.language),
+            title: const Text('Website'),
+            subtitle: const Text('classhub.knisium.com'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => _openUrl('https://classhub.knisium.com'),
           ),
         ],
       ),
