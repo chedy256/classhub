@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:classhub/share/services/deep_link_service.dart';
+import 'package:sync_engine/sync_engine.dart';
 
 class AddSourceDialog extends StatefulWidget {
   final List<String> incomingUrls;
@@ -83,13 +84,10 @@ class _AddSourceDialogState extends State<AddSourceDialog> {
 
   String _getRepoName(String url) {
     try {
-      final uri = Uri.parse(url);
-      final segments = uri.path.split('/').where((s) => s.isNotEmpty).toList();
-      if (segments.length >= 2) {
-        return segments[1];
-      }
-    } catch (_) {}
-    return url;
+      return getSourceFolderName(url);
+    } catch (_) {
+      return Uri.parse(url).pathSegments.where((s) => s.isNotEmpty).last;
+    }
   }
 
   void _showSnack(String message) {

@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:sync_engine/sync_engine.dart';
+import '../../core/services/sync_tracker.dart';
 import '../models/file_type_info.dart';
 import '../services/directory_watcher.dart';
 import '../services/file_explorer_service.dart';
@@ -42,6 +43,7 @@ class _MainScreenState extends State<MainScreen>
   final FileExplorerService _fileExplorerService = FileExplorerService();
   final TrashService _trashService = TrashService();
   final LinkService _linkService = LinkService();
+  final SyncTracker _syncTracker = SyncTracker();
   late DirectoryWatcher _watcher;
   List<FileSystemEntity> _entries = [];
 
@@ -102,17 +104,33 @@ class _MainScreenState extends State<MainScreen>
   }
 
   Future<void> _addSingleSource(String url) async {
-    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
+    final repoName = _getRepoName(url);
+    final repoPath = p.join(widget.rootPath, repoName);
+    var _firstProgress = true;
+
+    final trackerCallback = _syncTracker.start(repoPath);
+    final syncEngine = SyncEngine(
+      appFolder: Directory(widget.rootPath),
+      onProgress: (progress) {
+        if (!mounted) return;
+        if (_firstProgress) {
+          _firstProgress = false;
+          _loadEntries();
+        }
+        trackerCallback(progress);
+      },
+    );
     final result = await syncEngine.addSource(url);
+    _syncTracker.stop();
+    _syncTracker.clearProgress(repoPath);
     if (!mounted) return;
     _loadEntries();
     final color = Theme.of(context).colorScheme.inversePrimary;
-    final name = _getRepoName(url);
     if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '$name: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
+            '$repoName: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
           ),
           backgroundColor: color,
         ),
@@ -120,7 +138,7 @@ class _MainScreenState extends State<MainScreen>
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$name: ${result.error}'),
+          content: Text('$repoName: ${result.error}'),
           backgroundColor: color,
         ),
       );
@@ -129,29 +147,43 @@ class _MainScreenState extends State<MainScreen>
 
   String _getRepoName(String url) {
     try {
-      final uri = Uri.parse(url);
-      final segments = uri.path.split('/').where((s) => s.isNotEmpty).toList();
-      if (segments.length >= 2) return segments[1];
-    } catch (_) {}
-    return url;
+      return getSourceFolderName(url);
+    } catch (_) {
+      return url;
+    }
+  }
+
+  String _syncProgressText(SyncProgress p) {
+    final pct = p.totalBytes != null
+        ? ((p.byteProgress ?? 0) * 100).toInt()
+        : (p.progress * 100).toInt();
+    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
+    return '$pct%$file';
   }
 
   Future<void> _syncSource(Directory sourceDir) async {
-    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
+    final sourcePath = sourceDir.path;
+    final trackerCallback = _syncTracker.start(sourcePath);
+    final syncEngine = SyncEngine(
+      appFolder: Directory(widget.rootPath),
+      onProgress: (progress) {
+        if (mounted) trackerCallback(progress);
+      },
+    );
     final result = await syncEngine.syncSource(sourceDir);
+    _syncTracker.stop();
+    _syncTracker.clearProgress(sourcePath);
     if (!mounted) return;
     if (result.success) {
       _loadEntries();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
           ),
-        );
-      }
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        ),
+      );
     }
   }
 
@@ -330,6 +362,7 @@ class _MainScreenState extends State<MainScreen>
               _fileExplorerService.isSyncedSource(entity.path)
           ? () => _syncSource(entity)
           : null,
+      syncTracker: _syncTracker,
     );
   }
 
@@ -353,6 +386,7 @@ class _MainScreenState extends State<MainScreen>
               selectedPath,
               widget.rootPath,
             ),
+            syncTracker: _syncTracker,
           ),
         ),
       );
@@ -527,15 +561,19 @@ class _MainScreenState extends State<MainScreen>
                     ],
                   ),
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: _entries.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final entity = _entries[index];
-                    final isDir = entity is Directory;
-                    final name = p.basename(entity.path);
-                    final isSelected = _selectedIndices.contains(index);
+              : ValueListenableBuilder<Map<String, SyncProgress>>(
+                  valueListenable: _syncTracker.progress,
+                  builder: (context, syncProgress, _) {
+                    return ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      itemCount: _entries.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final entity = _entries[index];
+                        final isDir = entity is Directory;
+                        final name = p.basename(entity.path);
+                        final isSelected = _selectedIndices.contains(index);
+                        final progress = syncProgress[entity.path];
 
                     return Card(
                       child: InkWell(
@@ -555,6 +593,7 @@ class _MainScreenState extends State<MainScreen>
                                             entity.path,
                                             widget.rootPath,
                                           ),
+                                      syncTracker: _syncTracker,
                                     ),
                                   ),
                                 );
@@ -612,13 +651,27 @@ class _MainScreenState extends State<MainScreen>
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      _fileExplorerService.entitySubtitle(entity),
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
+                                    if (progress != null) ...[
+                                      LinearProgressIndicator(
+                                        value: progress.progress,
+                                        minHeight: 3,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _syncProgressText(progress),
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: colorScheme.primary,
+                                            ),
+                                      ),
+                                    ] else
+                                      Text(
+                                        _fileExplorerService.entitySubtitle(entity),
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -632,8 +685,10 @@ class _MainScreenState extends State<MainScreen>
                         ),
                       ),
                     );
-                  },
-                ),
+                    },
+                  );
+                },
+              ),
           ),
           if (_isFabExpanded && !_isSelecting)
             GestureDetector(
@@ -895,11 +950,13 @@ class _InsideFolderScreen extends StatefulWidget {
   final String folderPath;
   final String rootPath;
   final bool isInsideSource;
+  final SyncTracker? syncTracker;
 
   const _InsideFolderScreen({
     required this.folderPath,
     required this.rootPath,
     this.isInsideSource = false,
+    this.syncTracker,
   });
 
   @override
@@ -1016,24 +1073,34 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
 
   Future<void> _syncSource() async {
     setState(() => _isSyncing = true);
-    final syncEngine = SyncEngine(appFolder: Directory(widget.rootPath));
+    final sourcePath = widget.folderPath;
+
+    final trackerCallback = widget.syncTracker?.start(sourcePath) ?? _noopCallback;
+    final syncEngine = SyncEngine(
+      appFolder: Directory(widget.rootPath),
+      onProgress: (progress) {
+        if (mounted) trackerCallback(progress);
+      },
+    );
     final result = await syncEngine.syncSource(Directory(widget.folderPath));
-    setState(() => _isSyncing = false);
+    widget.syncTracker?.stop();
+    widget.syncTracker?.clearProgress(sourcePath);
     if (!mounted) return;
+    setState(() => _isSyncing = false);
     if (result.success) {
       _loadFiles();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Synced: ${result.filesAdded} added, ${result.filesUpdated} updated, ${result.filesDeleted} deleted',
           ),
-        );
-      }
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        ),
+      );
     }
   }
+
+  void _noopCallback(SyncProgress _) {}
 
   void _toggleSelect(int index) {
     setState(() {
@@ -1073,6 +1140,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
       _loadFiles,
       rootPath: widget.rootPath,
       trashService: _trashService,
+      syncTracker: widget.syncTracker,
     );
   }
 
@@ -1105,6 +1173,14 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     );
   }
 
+  String _syncProgressText(SyncProgress p) {
+    final pct = p.totalBytes != null
+        ? ((p.byteProgress ?? 0) * 100).toInt()
+        : (p.progress * 100).toInt();
+    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
+    return '$pct%$file';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1118,9 +1194,28 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               ? _cancelSelection
               : () => Navigator.pop(context),
         ),
-        title: _isSelecting
-            ? Text('${_selectedIndices.length} selected')
-            : Text(p.basename(widget.folderPath)),
+        title: ValueListenableBuilder<Map<String, SyncProgress>>(
+          valueListenable: widget.syncTracker?.progress ?? ValueNotifier({}),
+          builder: (context, syncProgress, _) {
+            final progress = syncProgress[widget.folderPath];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_isSelecting
+                    ? '${_selectedIndices.length} selected'
+                    : p.basename(widget.folderPath)),
+                if (progress != null && !_isSelecting)
+                  Text(
+                    _syncProgressText(progress),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.primary,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
         actions: _isSelecting
             ? [
                 IconButton(
@@ -1211,6 +1306,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                             entity.path,
                                             widget.rootPath,
                                           ),
+                                      syncTracker: widget.syncTracker,
                                     ),
                                   ),
                                 );
@@ -1357,6 +1453,7 @@ void _showEntityMenu(
   required String rootPath,
   required TrashService trashService,
   Future<void> Function()? onSync,
+  SyncTracker? syncTracker,
 }) {
   final insideSource = service.isInsideSource(entity.path, rootPath);
   final isSource = entity is Directory && service.isSyncedSource(entity.path);
@@ -1443,7 +1540,7 @@ void _showEntityMenu(
             title: const Text('Properties'),
             onTap: () {
               Navigator.pop(ctx);
-              _showPropertiesDialog(context, entity, service);
+              _showPropertiesDialog(context, entity, service, syncTracker);
             },
           ),
         ],
@@ -1456,20 +1553,27 @@ void _showPropertiesDialog(
   BuildContext context,
   FileSystemEntity entity,
   FileExplorerService service,
+  SyncTracker? syncTracker,
 ) {
   showDialog(
     context: context,
-    builder: (ctx) => _PropertiesDialog(entity: entity, service: service),
+    builder: (ctx) => _PropertiesDialog(
+      entity: entity,
+      service: service,
+      syncTracker: syncTracker,
+    ),
   );
 }
 
 class _PropertiesDialog extends StatefulWidget {
   final FileSystemEntity entity;
   final FileExplorerService service;
+  final SyncTracker? syncTracker;
 
   const _PropertiesDialog({
     required this.entity,
     required this.service,
+    this.syncTracker,
   });
 
   @override
@@ -1505,6 +1609,14 @@ class _PropertiesDialogState extends State<_PropertiesDialog> {
     } catch (_) {}
   }
 
+  String _syncProgressText(SyncProgress p) {
+    final pct = p.totalBytes != null
+        ? ((p.byteProgress ?? 0) * 100).toInt()
+        : (p.progress * 100).toInt();
+    final file = p.currentFile != null ? ' — ${p.currentFile}' : '';
+    return '$pct%$file';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDir = widget.entity is Directory;
@@ -1533,6 +1645,35 @@ class _PropertiesDialogState extends State<_PropertiesDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (widget.syncTracker != null && isDir)
+              ValueListenableBuilder<Map<String, SyncProgress>>(
+                valueListenable: widget.syncTracker!.progress,
+                builder: (context, syncProgress, _) {
+                  final progress = syncProgress[widget.entity.path];
+                  if (progress == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(
+                          value: progress.progress,
+                          minHeight: 4,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _syncProgressText(progress),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ...rows,
             if (_config != null) ...[
               const Divider(height: 24),
