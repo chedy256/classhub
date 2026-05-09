@@ -676,10 +676,18 @@ class _MainScreenState extends State<MainScreen>
                                         color: colorScheme.primaryContainer,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: (sourceConfig?.type).iconWidget(
-                                        size: 24,
-                                        color: colorScheme.onPrimaryContainer,
-                                      ),
+                                      child: sourceConfig != null
+                                          ? sourceConfig.type.iconWidget(
+                                              size: 24,
+                                              color: colorScheme.onPrimaryContainer,
+                                            )
+                                          : Icon(
+                                              isDir
+                                                  ? Icons.folder_outlined
+                                                  : FileTypeInfo.classify(name).icon,
+                                              size: 24,
+                                              color: colorScheme.onPrimaryContainer,
+                                            ),
                                     ),
                                     const SizedBox(width: 14),
                                     Expanded(

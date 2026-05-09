@@ -131,9 +131,8 @@ class SyncEngine {
 
   /// Performs the sync operation for an existing source.
   Future<SyncResult> syncSource(
-    Directory sourceFolder, {
-    bool forceFullSync = false,
-  }) async {
+    Directory sourceFolder,
+  ) async {
     try {
       final sourceFolderName = sourceFolder.uri.pathSegments
           .where((s) => s.isNotEmpty)
