@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
 import 'package:sync_engine/sync_engine.dart';
 import '../../core/services/sync_tracker.dart';
 import '../models/file_type_info.dart';
@@ -350,26 +351,35 @@ class _MainScreenState extends State<MainScreen>
   }
 
   Future<void> _shareSelected() async {
-    final toShare = _selectedIndices
-        .map((i) => _entries[i])
+    final selected = _selectedIndices.map((i) => _entries[i]).toList();
+    final files = selected.whereType<File>().toList();
+
+    if (files.isNotEmpty) {
+      await Share.shareXFiles(files.map((f) => XFile(f.path)).toList());
+      _cancelSelection();
+      return;
+    }
+
+    final sourceDirs = selected
         .whereType<Directory>()
         .where((d) => _fileExplorerService.isSyncedSource(d.path))
         .toList();
-
-    final urls = <String>[];
-    for (final dir in toShare) {
-      final url = _fileExplorerService.getSourceUrl(dir.path);
-      if (url != null) urls.add(url);
-    }
-
+    final urls = sourceDirs
+        .map((d) => _fileExplorerService.getSourceUrl(d.path))
+        .whereType<String>()
+        .toList();
     if (urls.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Aucun source sélectionné')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Aucun source sélectionné')));
+      }
+      _cancelSelection();
       return;
     }
 
     await _linkService.shareSheet(urls);
+    _cancelSelection();
   }
 
   void _showItemMenu(FileSystemEntity entity) {
@@ -560,7 +570,11 @@ class _MainScreenState extends State<MainScreen>
                             ? null
                             : _shareSelected,
                         icon: const Icon(Icons.share),
-                        label: const Text('Share'),
+                        label: Text(
+                          _selectedIndices.any((i) => _entries[i] is File)
+                              ? 'Share files'
+                              : 'Share sources',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1255,6 +1269,39 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
     );
   }
 
+  Future<void> _shareSelected() async {
+    final selected = _selectedIndices.map((i) => _files[i]).toList();
+    final files = selected.whereType<File>().toList();
+
+    if (files.isNotEmpty) {
+      await Share.shareXFiles(files.map((f) => XFile(f.path)).toList());
+      _cancelSelection();
+      return;
+    }
+
+    final sourceDirs = selected
+        .whereType<Directory>()
+        .where((d) => _fileExplorerService.isSyncedSource(d.path))
+        .toList();
+    final urls = sourceDirs
+        .map((d) => _fileExplorerService.getSourceUrl(d.path))
+        .whereType<String>()
+        .toList();
+    if (urls.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Aucun source sélectionné')));
+      }
+      _cancelSelection();
+      return;
+    }
+
+    final linkService = LinkService();
+    await linkService.shareSheet(urls);
+    _cancelSelection();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1332,14 +1379,34 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               ]
             : null,
       ),
-      bottomNavigationBar: _isSelecting && !widget.isInsideSource
+      bottomNavigationBar: _isSelecting
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: OutlinedButton.icon(
-                  onPressed: _selectedIndices.isEmpty ? null : _deleteSelected,
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Move to trash'),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _selectedIndices.isEmpty ? null : _shareSelected,
+                        icon: const Icon(Icons.share),
+                        label: Text(
+                          _selectedIndices.any((i) => _files[i] is File)
+                              ? 'Share files'
+                              : 'Share sources',
+                        ),
+                      ),
+                    ),
+                    if (!widget.isInsideSource) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _selectedIndices.isEmpty ? null : _deleteSelected,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Move to trash'),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             )
@@ -1417,21 +1484,19 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                   _loadFiles();
                                 }
                               : () => OpenFile.open(entity.path),
-                          onLongPress: widget.isInsideSource
-                              ? null
-                              : () {
-                                  if (!_isSelecting) {
-                                    setState(() {
-                                      _isSelecting = true;
-                                      _selectedIndices.add(index);
-                                    });
-                                  }
-                                },
+                          onLongPress: () {
+                              if (!_isSelecting) {
+                                setState(() {
+                                  _isSelecting = true;
+                                  _selectedIndices.add(index);
+                                });
+                              }
+                            },
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Row(
                               children: [
-                                if (_isSelecting && !widget.isInsideSource) ...[
+                                if (_isSelecting) ...[
                                   Icon(
                                     isSelected
                                         ? Icons.check_circle
@@ -1634,10 +1699,19 @@ void _showEntityMenu(
           if (sourceUrl != null)
             ListTile(
               leading: const Icon(Icons.share),
-              title: const Text('Share'),
+              title: const Text('Share source'),
               onTap: () {
                 Navigator.pop(ctx);
                 linkService.shareSheet([sourceUrl]);
+              },
+            ),
+          if (entity is File)
+            ListTile(
+              leading: const Icon(Icons.file_present_outlined),
+              title: const Text('Share file'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Share.shareXFiles([XFile(entity.path)]);
               },
             ),
           ListTile(
