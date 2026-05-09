@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.2.3 - 2026-05-09
+
+### Added
+
+- Share folders as zip archives from context menu and multi-selection
+- Dynamic share button label ("Share files" / "Share sources" / "Share content") based on selection
+
+### Changed
+
+- Swapped multi-select bottom bar: "Move to trash" on left, "Share" on right
+- Folder sharing now zips directories alongside files when mixed selection
+- Non-source folders fall back to zip sharing instead of showing empty URL error
+- Rename dialog pre-fills current name in the input field
+
+### Internal
+
+- Added `archive: ^4.0.9` dependency for zip creation
+- Added `zipDirectories()` to `FileExplorerService` with 30s temp cleanup
+
+---
+
 ## v1.2.2 - 2026-05-09
 
 ### Changed
