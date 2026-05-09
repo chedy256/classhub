@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 class FileExplorerService {
@@ -66,6 +69,36 @@ class FileExplorerService {
         .whereType<Directory>()
         .where((d) => isSyncedSource(d.path))
         .toList();
+  }
+
+  Future<List<XFile>> zipDirectories(List<Directory> dirs) async {
+    if (dirs.isEmpty) return [];
+    final tempDir = await getTemporaryDirectory();
+    final results = <XFile>[];
+    for (final dir in dirs) {
+      final zipPath = '${tempDir.path}/${p.basename(dir.path)}.zip';
+      try {
+        final archive = Archive();
+        for (final entity in dir.listSync(recursive: true)) {
+          if (entity is File) {
+            final rel = p.relative(entity.path, from: dir.path);
+            final bytes = entity.readAsBytesSync();
+            archive.addFile(ArchiveFile(rel, bytes.length, bytes));
+          }
+        }
+        final data = ZipEncoder().encode(archive);
+        if (data != null) {
+          await File(zipPath).writeAsBytes(data);
+          results.add(XFile(zipPath));
+        }
+      } catch (_) {}
+    }
+    Future.delayed(const Duration(seconds: 30), () {
+      for (final xf in results) {
+        File(xf.path).deleteSync();
+      }
+    });
+    return results;
   }
 
   List<FileSystemEntity> loadFolderContents(String folderPath) {

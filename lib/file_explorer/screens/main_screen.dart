@@ -44,6 +44,16 @@ class _MainScreenState extends State<MainScreen>
   final FileExplorerService _fileExplorerService = FileExplorerService();
   final TrashService _trashService = TrashService();
   final LinkService _linkService = LinkService();
+
+  String get _shareLabel {
+    final hasFiles = _selectedIndices.any((i) => _entries[i] is File);
+    if (hasFiles) return 'Share files';
+    final onlySources = _selectedIndices.every((i) {
+      final e = _entries[i];
+      return e is Directory && _fileExplorerService.isSyncedSource(e.path);
+    });
+    return onlySources && _selectedIndices.isNotEmpty ? 'Share sources' : 'Share content';
+  }
   final SyncTracker _syncTracker = SyncTracker();
   late DirectoryWatcher _watcher;
   List<FileSystemEntity> _entries = [];
@@ -353,32 +363,41 @@ class _MainScreenState extends State<MainScreen>
   Future<void> _shareSelected() async {
     final selected = _selectedIndices.map((i) => _entries[i]).toList();
     final files = selected.whereType<File>().toList();
+    final dirs = selected.whereType<Directory>().toList();
+    final hasFiles = files.isNotEmpty;
 
-    if (files.isNotEmpty) {
-      await Share.shareXFiles(files.map((f) => XFile(f.path)).toList());
+    if (hasFiles) {
+      final xFiles = <XFile>[
+        ...files.map((f) => XFile(f.path)),
+        ...await _fileExplorerService.zipDirectories(dirs),
+      ];
+      await Share.shareXFiles(xFiles);
       _cancelSelection();
       return;
     }
 
-    final sourceDirs = selected
-        .whereType<Directory>()
+    final sources = dirs
         .where((d) => _fileExplorerService.isSyncedSource(d.path))
         .toList();
-    final urls = sourceDirs
-        .map((d) => _fileExplorerService.getSourceUrl(d.path))
-        .whereType<String>()
-        .toList();
-    if (urls.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Aucun source sélectionné')));
+    if (sources.length == dirs.length && sources.isNotEmpty) {
+      final urls = sources
+          .map((d) => _fileExplorerService.getSourceUrl(d.path))
+          .whereType<String>()
+          .toList();
+      if (urls.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Aucun source sélectionné')),
+          );
+        }
+        _cancelSelection();
+        return;
       }
-      _cancelSelection();
-      return;
+      await _linkService.shareSheet(urls);
+    } else {
+      final xFiles = await _fileExplorerService.zipDirectories(dirs);
+      await Share.shareXFiles(xFiles);
     }
-
-    await _linkService.shareSheet(urls);
     _cancelSelection();
   }
 
@@ -565,27 +584,25 @@ class _MainScreenState extends State<MainScreen>
                 child: Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _selectedIndices.isEmpty
-                            ? null
-                            : _shareSelected,
-                        icon: const Icon(Icons.share),
-                        label: Text(
-                          _selectedIndices.any((i) => _entries[i] is File)
-                              ? 'Share files'
-                              : 'Share sources',
+                        child: OutlinedButton.icon(
+                          onPressed: _selectedIndices.isEmpty
+                              ? null
+                              : _deleteSelected,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Move to trash'),
                         ),
-                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _selectedIndices.isEmpty
-                            ? null
-                            : _deleteSelected,
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Move to trash'),
-                      ),
+                        child: OutlinedButton.icon(
+                          onPressed: _selectedIndices.isEmpty
+                              ? null
+                              : _shareSelected,
+                          icon: const Icon(Icons.share),
+                          label: Text(
+                            _shareLabel,
+                          ),
+                        ),
                     ),
                   ],
                 ),
@@ -1071,6 +1088,16 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
   final FileExplorerService _fileExplorerService = FileExplorerService();
   final TrashService _trashService = TrashService();
   late DirectoryWatcher _watcher;
+
+  String get _insideShareLabel {
+    final hasFiles = _selectedIndices.any((i) => _files[i] is File);
+    if (hasFiles) return 'Share files';
+    final onlySources = _selectedIndices.every((i) {
+      final e = _files[i];
+      return e is Directory && _fileExplorerService.isSyncedSource(e.path);
+    });
+    return onlySources && _selectedIndices.isNotEmpty ? 'Share sources' : 'Share content';
+  }
   List<FileSystemEntity> _files = [];
   final Set<int> _selectedIndices = {};
   bool _isSelecting = false;
@@ -1272,33 +1299,42 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
   Future<void> _shareSelected() async {
     final selected = _selectedIndices.map((i) => _files[i]).toList();
     final files = selected.whereType<File>().toList();
+    final dirs = selected.whereType<Directory>().toList();
+    final hasFiles = files.isNotEmpty;
 
-    if (files.isNotEmpty) {
-      await Share.shareXFiles(files.map((f) => XFile(f.path)).toList());
+    if (hasFiles) {
+      final xFiles = <XFile>[
+        ...files.map((f) => XFile(f.path)),
+        ...await _fileExplorerService.zipDirectories(dirs),
+      ];
+      await Share.shareXFiles(xFiles);
       _cancelSelection();
       return;
     }
 
-    final sourceDirs = selected
-        .whereType<Directory>()
+    final sources = dirs
         .where((d) => _fileExplorerService.isSyncedSource(d.path))
         .toList();
-    final urls = sourceDirs
-        .map((d) => _fileExplorerService.getSourceUrl(d.path))
-        .whereType<String>()
-        .toList();
-    if (urls.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Aucun source sélectionné')));
+    if (sources.length == dirs.length && sources.isNotEmpty) {
+      final urls = sources
+          .map((d) => _fileExplorerService.getSourceUrl(d.path))
+          .whereType<String>()
+          .toList();
+      if (urls.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Aucun source sélectionné')),
+          );
+        }
+        _cancelSelection();
+        return;
       }
-      _cancelSelection();
-      return;
+      final linkService = LinkService();
+      await linkService.shareSheet(urls);
+    } else {
+      final xFiles = await _fileExplorerService.zipDirectories(dirs);
+      await Share.shareXFiles(xFiles);
     }
-
-    final linkService = LinkService();
-    await linkService.shareSheet(urls);
     _cancelSelection();
   }
 
@@ -1385,19 +1421,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _selectedIndices.isEmpty ? null : _shareSelected,
-                        icon: const Icon(Icons.share),
-                        label: Text(
-                          _selectedIndices.any((i) => _files[i] is File)
-                              ? 'Share files'
-                              : 'Share sources',
-                        ),
-                      ),
-                    ),
                     if (!widget.isInsideSource) ...[
-                      const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: _selectedIndices.isEmpty ? null : _deleteSelected,
@@ -1405,7 +1429,15 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                           label: const Text('Move to trash'),
                         ),
                       ),
+                      const SizedBox(width: 12),
                     ],
+                    Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _selectedIndices.isEmpty ? null : _shareSelected,
+                          icon: const Icon(Icons.share),
+                          label: Text(_insideShareLabel),
+                        ),
+                    ),
                   ],
                 ),
               ),
@@ -1589,9 +1621,10 @@ Future<String?> _showTextInputDialog(
   BuildContext context,
   String title,
   String hint,
-  String action,
-) {
-  final controller = TextEditingController();
+  String action, {
+  String? initialValue,
+}) {
+  final controller = TextEditingController(text: initialValue);
   return showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -1648,6 +1681,7 @@ void _showEntityMenu(
                   'Rename',
                   oldName,
                   'Rename',
+                  initialValue: oldName,
                 );
                 if (newName != null &&
                     newName.isNotEmpty &&
@@ -1712,6 +1746,18 @@ void _showEntityMenu(
               onTap: () {
                 Navigator.pop(ctx);
                 Share.shareXFiles([XFile(entity.path)]);
+              },
+            ),
+          if (entity is Directory)
+            ListTile(
+              leading: const Icon(Icons.folder_zip_outlined),
+              title: const Text('Share as zip'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final xFiles = await service.zipDirectories([entity]);
+                if (xFiles.isNotEmpty) {
+                  await Share.shareXFiles(xFiles);
+                }
               },
             ),
           ListTile(

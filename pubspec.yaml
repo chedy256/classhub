@@ -46,6 +46,7 @@ dependencies:
   http: ^1.2.1
   path_provider: ^2.1.2
   path: ^1.9.0
+  archive: ^4.0.9
   sync_engine:
     path: lib/packages/sync_engine
 
