@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.2.2 - 2026-05-09
+
+### Changed
+
+- Switched to Material Design icon fonts for source type icons
+- File-type-aware icons for regular files (PDF, video, image, etc.)
+
+### Fixed
+
+- Files showing folder icon in main screen list
+- Empty named parameter syntax in SyncEngine
+
+---
+
 ## v1.2.1 - 2026-05-06
 
 ### Added
