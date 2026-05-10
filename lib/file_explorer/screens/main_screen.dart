@@ -113,9 +113,6 @@ class _MainScreenState extends State<MainScreen>
     final changelog = await loadFullChangelog();
     if (changelog.isEmpty || !mounted) return;
 
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-
     showWhatsNewDialog(context, appVersion, changelog);
   }
 
