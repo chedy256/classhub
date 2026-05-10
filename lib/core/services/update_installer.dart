@@ -8,24 +8,25 @@ import '../services/sync_foreground_service.dart';
 
 class UpdateInstaller {
   final SyncForegroundService _nativeService = SyncForegroundService();
+  bool _isDownloading = false;
 
-  Future<String?> downloadApk(String apkUrl) async {
+  Future<String?> downloadApk(
+    String apkUrl, {
+    void Function(double progress)? onProgress,
+  }) async {
+    if (_isDownloading) {
+      debugPrint('[UpdateInstaller] Already downloading');
+      return null;
+    }
+    _isDownloading = true;
+
     File? apkFile;
     try {
       final dir = await getTemporaryDirectory();
-      apkFile = File('${dir.path}/classhub_update.apk');
+      final filePath = '${dir.path}/classhub_update.apk';
+      apkFile = File(filePath);
 
-      final expectedSize = await _getRemoteFileSize(apkUrl);
-      debugPrint('[UpdateInstaller] Expected size: $expectedSize bytes');
-
-      if (expectedSize != null && apkFile.existsSync()) {
-        final localSize = apkFile.lengthSync();
-        debugPrint('[UpdateInstaller] Local size: $localSize bytes');
-        if (localSize == expectedSize) {
-          debugPrint('[UpdateInstaller] APK already exists, skipping download');
-          return apkFile.path;
-        }
-        debugPrint('[UpdateInstaller] Size mismatch, re-downloading');
+      if (apkFile.existsSync()) {
         await apkFile.delete();
       }
 
@@ -42,7 +43,7 @@ class UpdateInstaller {
           return null;
         }
 
-        int totalSize = response.contentLength ?? expectedSize ?? 0;
+        final totalSize = response.contentLength ?? 0;
         int received = 0;
         int lastPercent = 0;
 
@@ -53,7 +54,10 @@ class UpdateInstaller {
             received += chunk.length;
 
             if (totalSize > 0) {
-              final percent = ((received / totalSize) * 100).toInt();
+              final progress = received / totalSize;
+              final percent = (progress * 100).toInt();
+              onProgress?.call(progress);
+
               if (percent != lastPercent && percent <= 100) {
                 lastPercent = percent;
                 _nativeService.update(
@@ -103,21 +107,8 @@ class UpdateInstaller {
         } catch (_) {}
       }
       return null;
-    }
-  }
-
-  Future<int?> _getRemoteFileSize(String url) async {
-    try {
-      final client = http.Client();
-      try {
-        final request = http.Request('HEAD', Uri.parse(url));
-        final response = await client.send(request);
-        return response.contentLength;
-      } finally {
-        client.close();
-      }
-    } catch (_) {
-      return null;
+    } finally {
+      _isDownloading = false;
     }
   }
 
@@ -142,6 +133,21 @@ class UpdateInstaller {
 
     final result = await OpenFile.open(apkPath);
     debugPrint('[UpdateInstaller] Install result: ${result.type} - ${result.message}');
-    return result.type == ResultType.done;
+
+    final success = result.type == ResultType.done;
+
+    if (success) {
+      try {
+        final file = File(apkPath);
+        if (file.existsSync()) {
+          await file.delete();
+          debugPrint('[UpdateInstaller] APK cleaned up');
+        }
+      } catch (e) {
+        debugPrint('[UpdateInstaller] Cleanup failed: $e');
+      }
+    }
+
+    return success;
   }
 }

@@ -46,7 +46,14 @@ class _AboutScreenState extends State<AboutScreen> {
 
     final installer = UpdateInstaller();
 
-    final path = await installer.downloadApk(_updateInfo!.apkUrl);
+    final path = await installer.downloadApk(
+      _updateInfo!.apkUrl,
+      onProgress: (progress) {
+        if (mounted) {
+          setState(() => _downloadProgress = progress);
+        }
+      },
+    );
     if (!mounted) return;
 
     if (path == null) {
@@ -181,7 +188,7 @@ class _AboutScreenState extends State<AboutScreen> {
                   LinearProgressIndicator(value: _downloadProgress),
                   const SizedBox(height: 4),
                   Text(
-                    'Check the notification for progress',
+                    '${(_downloadProgress * 100).toInt()}% downloaded',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
