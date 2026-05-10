@@ -4,20 +4,22 @@
 
 ### Added
 
-- "What's New" bottom sheet shown on first launch after each update
-- Rendered changelog using flutter_markdown for proper headers, lists, and formatting
-- Animated moving wave progress indicator (later replaced with simple divider)
-- Version tracking via SharedPreferences to detect updates
+- "What's New" bottom sheet with rendered changelog on update
+- Download progress bar in About screen
+- Version tracking for update detection
 
-### Changed
+### Fixed
 
-- Rename dialog now pre-fills the current filename
+- Concurrent APK download guard
+- Orphaned temp ZIP files cleaned on startup
+- APK removed after install
+- Don't reuse cached APK by size
 
 ### Internal
 
-- Added `flutter_markdown` dependency for markdown rendering
-- Added `ClasshubStorageService.getLastSeenVersion()` / `saveLastSeenVersion()`
-- Added `changelog_service.dart` with `loadFullChangelog()` and `showWhatsNewDialog()`
+- `flutter_markdown` dependency
+- `ClasshubStorageService.lastSeenVersion`
+- `changelog_service.dart`
 
 ---
 
