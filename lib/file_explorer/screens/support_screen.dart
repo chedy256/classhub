@@ -40,7 +40,7 @@ class SupportScreen extends StatelessWidget {
             title: const Text('Report a bug'),
             subtitle: const Text('GitHub Issues'),
             trailing: const Icon(Icons.open_in_new),
-            onTap: () => _openUrl('https://github.com/titanknis/classhub/issues'),
+            onTap: () => _openUrl('https://github.com/ClassHubTeam/classhub/issues'),
           ),
           ListTile(
             leading: const Icon(Icons.share),

@@ -150,7 +150,7 @@ class _AboutScreenState extends State<AboutScreen> {
             title: const Text('Source code'),
             subtitle: const Text('GitHub repository'),
             trailing: const Icon(Icons.open_in_new),
-            onTap: () => _openUrl('https://github.com/titanknis/classhub'),
+            onTap: () => _openUrl('https://github.com/ClassHubTeam/classhub'),
           ),
           ListTile(
             leading: const Icon(Icons.language),
