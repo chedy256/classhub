@@ -1,6 +1,6 @@
 # sync_engine
 
-A Dart package for pulling and syncing course material from remote sources (GitHub, Google Drive, Google Classroom) to local storage. Built as the core of the [ClassHub](https://github.com/titanknis/classhub) mobile app.
+A Dart package for pulling and syncing course material from remote sources (GitHub, Google Drive, Google Classroom) to local storage. Built as the core of the [ClassHub](https://github.com/ClassHubTeam/classhub) mobile app.
 
 ---
 

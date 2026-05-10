@@ -28,7 +28,7 @@ cd lib/packages/sync_engine && dart test test/sync/models/source_config_test.dar
 
 ## Release
 
-Push tag `v*` to trigger `.github/workflows/release.yml` - builds APK, publishes to `titanknis/classhub-releases`.
+Push tag `v*` to trigger `.github/workflows/release.yml` - builds APK, publishes to `ClassHubTeam/classhub-releases`.
 
 ## Dev Environment
 

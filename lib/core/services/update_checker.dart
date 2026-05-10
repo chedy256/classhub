@@ -28,7 +28,7 @@ Future<UpdateInfo?> checkForUpdate() async {
     final response = await http
         .get(
           Uri.parse(
-              'https://api.github.com/repos/titanknis/classhub/releases/latest'),
+              'https://api.github.com/repos/ClassHubTeam/classhub/releases/latest'),
           headers: headers,
         )
         .timeout(const Duration(seconds: 5));
