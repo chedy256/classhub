@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.2.4 - 2026-05-10
+
+### Added
+
+- "What's New" bottom sheet with rendered changelog on update
+- Download progress bar in About screen
+- Version tracking for update detection
+
+### Fixed
+
+- Concurrent APK download guard
+- Orphaned temp ZIP files cleaned on startup
+- APK removed after install
+- Don't reuse cached APK by size
+
+### Internal
+
+- `flutter_markdown` dependency
+- `ClasshubStorageService.lastSeenVersion`
+- `changelog_service.dart`
+
+---
+
 ## v1.2.3 - 2026-05-09
 
 ### Added

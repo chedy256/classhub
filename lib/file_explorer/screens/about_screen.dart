@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/version.dart';
 import '../../core/services/update_checker.dart';
 import '../../core/services/update_installer.dart';
+import '../../core/services/changelog_service.dart';
 
 enum _UpdateState { checking, available, downloading, installing, error, none }
 
@@ -46,7 +47,14 @@ class _AboutScreenState extends State<AboutScreen> {
 
     final installer = UpdateInstaller();
 
-    final path = await installer.downloadApk(_updateInfo!.apkUrl);
+    final path = await installer.downloadApk(
+      _updateInfo!.apkUrl,
+      onProgress: (progress) {
+        if (mounted) {
+          setState(() => _downloadProgress = progress);
+        }
+      },
+    );
     if (!mounted) return;
 
     if (path == null) {
@@ -131,6 +139,13 @@ class _AboutScreenState extends State<AboutScreen> {
           ),
           const SizedBox(height: 32),
           ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('Changelog'),
+            subtitle: Text('v$appVersion'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _showChangelog,
+          ),
+          ListTile(
             leading: const Icon(Icons.code),
             title: const Text('Source code'),
             subtitle: const Text('GitHub repository'),
@@ -181,7 +196,7 @@ class _AboutScreenState extends State<AboutScreen> {
                   LinearProgressIndicator(value: _downloadProgress),
                   const SizedBox(height: 4),
                   Text(
-                    'Check the notification for progress',
+                    '${(_downloadProgress * 100).toInt()}% downloaded',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -258,5 +273,11 @@ class _AboutScreenState extends State<AboutScreen> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
+  }
+
+  Future<void> _showChangelog() async {
+    final changelog = await loadFullChangelog();
+    if (!mounted || changelog.isEmpty) return;
+    showWhatsNewDialog(context, appVersion, changelog);
   }
 }

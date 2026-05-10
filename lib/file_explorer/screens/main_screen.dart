@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sync_engine/sync_engine.dart';
 import '../../core/services/sync_tracker.dart';
 import '../models/file_type_info.dart';
@@ -17,7 +18,9 @@ import 'support_screen.dart';
 import 'about_screen.dart';
 import 'package:classhub/share/screens/add_screen.dart';
 import 'package:classhub/share/services/deep_link_service.dart';
+import '../../core/version.dart';
 import '../../core/services/update_checker.dart';
+import '../../core/services/changelog_service.dart';
 import '../../core/services/classhub_storage_service.dart';
 import '../models/source_type_icon.dart';
 import '../services/sync_utils.dart';
@@ -52,8 +55,11 @@ class _MainScreenState extends State<MainScreen>
       final e = _entries[i];
       return e is Directory && _fileExplorerService.isSyncedSource(e.path);
     });
-    return onlySources && _selectedIndices.isNotEmpty ? 'Share sources' : 'Share content';
+    return onlySources && _selectedIndices.isNotEmpty
+        ? 'Share sources'
+        : 'Share content';
   }
+
   final SyncTracker _syncTracker = SyncTracker();
   late DirectoryWatcher _watcher;
   List<FileSystemEntity> _entries = [];
@@ -75,7 +81,42 @@ class _MainScreenState extends State<MainScreen>
     _watcher = DirectoryWatcher(path: widget.rootPath, onChanged: _loadEntries);
     _watcher.start();
     _recoverInterruptedSyncs();
+    _cleanupTempFiles();
     _checkForUpdate();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _showWhatsNewIfNeeded(),
+    );
+  }
+
+  Future<void> _cleanupTempFiles() async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final entries = dir.listSync();
+      for (final entry in entries) {
+        if (entry is File && entry.path.endsWith('.zip')) {
+          try {
+            entry.deleteSync();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _showWhatsNewIfNeeded() async {
+    final lastSeen = await ClasshubStorageService.getLastSeenVersion();
+    if (lastSeen == null) {
+      await ClasshubStorageService.saveLastSeenVersion(appVersion);
+      return;
+    } else if (lastSeen == appVersion) return;
+    await ClasshubStorageService.saveLastSeenVersion(appVersion);
+
+    final changelog = await loadFullChangelog();
+    if (changelog.isEmpty || !mounted) return;
+
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+
+    showWhatsNewDialog(context, appVersion, changelog);
   }
 
   Future<void> _checkForUpdate() async {
@@ -584,25 +625,23 @@ class _MainScreenState extends State<MainScreen>
                 child: Row(
                   children: [
                     Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _selectedIndices.isEmpty
-                              ? null
-                              : _deleteSelected,
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('Move to trash'),
-                        ),
+                      child: OutlinedButton.icon(
+                        onPressed: _selectedIndices.isEmpty
+                            ? null
+                            : _deleteSelected,
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Move to trash'),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _selectedIndices.isEmpty
-                              ? null
-                              : _shareSelected,
-                          icon: const Icon(Icons.share),
-                          label: Text(
-                            _shareLabel,
-                          ),
-                        ),
+                      child: OutlinedButton.icon(
+                        onPressed: _selectedIndices.isEmpty
+                            ? null
+                            : _shareSelected,
+                        icon: const Icon(Icons.share),
+                        label: Text(_shareLabel),
+                      ),
                     ),
                   ],
                 ),
@@ -710,14 +749,18 @@ class _MainScreenState extends State<MainScreen>
                                       child: sourceConfig != null
                                           ? sourceConfig.type.iconWidget(
                                               size: 24,
-                                              color: colorScheme.onPrimaryContainer,
+                                              color: colorScheme
+                                                  .onPrimaryContainer,
                                             )
                                           : Icon(
                                               isDir
                                                   ? Icons.folder_outlined
-                                                  : FileTypeInfo.classify(name).icon,
+                                                  : FileTypeInfo.classify(
+                                                      name,
+                                                    ).icon,
                                               size: 24,
-                                              color: colorScheme.onPrimaryContainer,
+                                              color: colorScheme
+                                                  .onPrimaryContainer,
                                             ),
                                     ),
                                     const SizedBox(width: 14),
@@ -1096,8 +1139,11 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
       final e = _files[i];
       return e is Directory && _fileExplorerService.isSyncedSource(e.path);
     });
-    return onlySources && _selectedIndices.isNotEmpty ? 'Share sources' : 'Share content';
+    return onlySources && _selectedIndices.isNotEmpty
+        ? 'Share sources'
+        : 'Share content';
   }
+
   List<FileSystemEntity> _files = [];
   final Set<int> _selectedIndices = {};
   bool _isSelecting = false;
@@ -1424,7 +1470,9 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                     if (!widget.isInsideSource) ...[
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: _selectedIndices.isEmpty ? null : _deleteSelected,
+                          onPressed: _selectedIndices.isEmpty
+                              ? null
+                              : _deleteSelected,
                           icon: const Icon(Icons.delete_outline),
                           label: const Text('Move to trash'),
                         ),
@@ -1432,11 +1480,13 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                       const SizedBox(width: 12),
                     ],
                     Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _selectedIndices.isEmpty ? null : _shareSelected,
-                          icon: const Icon(Icons.share),
-                          label: Text(_insideShareLabel),
-                        ),
+                      child: OutlinedButton.icon(
+                        onPressed: _selectedIndices.isEmpty
+                            ? null
+                            : _shareSelected,
+                        icon: const Icon(Icons.share),
+                        label: Text(_insideShareLabel),
+                      ),
                     ),
                   ],
                 ),
@@ -1517,13 +1567,13 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                 }
                               : () => OpenFile.open(entity.path),
                           onLongPress: () {
-                              if (!_isSelecting) {
-                                setState(() {
-                                  _isSelecting = true;
-                                  _selectedIndices.add(index);
-                                });
-                              }
-                            },
+                            if (!_isSelecting) {
+                              setState(() {
+                                _isSelecting = true;
+                                _selectedIndices.add(index);
+                              });
+                            }
+                          },
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Row(
