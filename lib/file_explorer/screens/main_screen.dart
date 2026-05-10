@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sync_engine/sync_engine.dart';
 import '../../core/services/sync_tracker.dart';
 import '../models/file_type_info.dart';
@@ -80,10 +81,25 @@ class _MainScreenState extends State<MainScreen>
     _watcher = DirectoryWatcher(path: widget.rootPath, onChanged: _loadEntries);
     _watcher.start();
     _recoverInterruptedSyncs();
+    _cleanupTempFiles();
     _checkForUpdate();
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _showWhatsNewIfNeeded(),
     );
+  }
+
+  Future<void> _cleanupTempFiles() async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final entries = dir.listSync();
+      for (final entry in entries) {
+        if (entry is File && entry.path.endsWith('.zip')) {
+          try {
+            entry.deleteSync();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _showWhatsNewIfNeeded() async {
