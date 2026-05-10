@@ -44,7 +44,8 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
     if (saved != null && mounted) {
       setState(() => _selectedPath = saved);
     } else {
-      setState(() => _selectedPath = ClasshubStorageService.getDefaultPath());
+      final defaultPath = await ClasshubStorageService.getDefaultPath();
+      if (mounted) setState(() => _selectedPath = defaultPath);
     }
   }
 
