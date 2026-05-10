@@ -27,9 +27,13 @@ import '../services/sync_utils.dart';
 
 class MainScreen extends StatefulWidget {
   final String rootPath;
-  final void Function(ThemeMode)? onThemeChanged;
+  final ThemeMode initialThemeMode;
 
-  const MainScreen({super.key, required this.rootPath, this.onThemeChanged});
+  const MainScreen({
+    super.key,
+    required this.rootPath,
+    required this.initialThemeMode,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -514,7 +518,9 @@ class _MainScreenState extends State<MainScreen>
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          SettingsScreen(onThemeChanged: widget.onThemeChanged),
+                          SettingsScreen(
+                            initialThemeMode: widget.initialThemeMode,
+                          ),
                     ),
                   );
                 },

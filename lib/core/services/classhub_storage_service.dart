@@ -1,12 +1,14 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ClasshubStorageService {
   static const String _pathKey = 'classhub_root_path';
   static const String _themeKey = 'classhub_theme_mode';
+  static const _storageChannel = MethodChannel('com.knisium.classhub/storage');
   static const String _githubTokenKey = 'classhub_github_token';
   static const String _lastUpdateCheckKey = 'classhub_last_update_check';
   static const String _lastSeenVersionKey = 'classhub_last_seen_version';
@@ -23,8 +25,13 @@ class ClasshubStorageService {
     await prefs.setString(_pathKey, path);
   }
 
-  static String getDefaultPath() {
+  static Future<String> getDefaultPath() async {
     if (Platform.isAndroid) {
+      try {
+        final base = await _storageChannel.invokeMethod<String>(
+            'getExternalStorageDirectory');
+        if (base != null && base.isNotEmpty) return p.join(base, 'ClassHub');
+      } catch (_) {}
       return '/storage/emulated/0/ClassHub';
     } else if (Platform.isWindows) {
       final home = Platform.environment['USERPROFILE'] ?? '';

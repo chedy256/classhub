@@ -12,7 +12,12 @@ class OnboardingScreen extends StatelessWidget {
     return Scaffold(
       body: FolderSelectionWrapper(
         onComplete: (path) => Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => MainScreen(rootPath: path)),
+          MaterialPageRoute(
+            builder: (_) => MainScreen(
+              rootPath: path,
+              initialThemeMode: ThemeMode.system,
+            ),
+          ),
         ),
       ),
     );
@@ -44,7 +49,8 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
     if (saved != null && mounted) {
       setState(() => _selectedPath = saved);
     } else {
-      setState(() => _selectedPath = ClasshubStorageService.getDefaultPath());
+      final defaultPath = await ClasshubStorageService.getDefaultPath();
+      if (mounted) setState(() => _selectedPath = defaultPath);
     }
   }
 

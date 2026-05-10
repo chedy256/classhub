@@ -39,53 +39,28 @@ class ClasshubApp extends StatefulWidget {
   });
 
   @override
-  State<ClasshubApp> createState() => _ClasshubAppState();
+  State<ClasshubApp> createState() => ClasshubAppState();
 }
 
-class _ClasshubAppState extends State<ClasshubApp> {
+class ClasshubAppState extends State<ClasshubApp> {
   late ThemeMode _themeMode;
 
   @override
   void initState() {
     super.initState();
     _themeMode = widget.initialThemeMode;
-    debugPrint('[Theme] initState: _themeMode=$_themeMode');
   }
 
   void updateTheme(ThemeMode mode) {
-    debugPrint('[ClasshubApp] updateTheme called: mode=$mode');
     setState(() {
-      debugPrint(
-        '[ClasshubApp] setState updating _themeMode from $_themeMode to $mode',
-      );
       _themeMode = mode;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[ClasshubApp] build: _themeMode=$_themeMode');
-
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
-        final bool isDark = _themeMode == ThemeMode.dark;
-        final bool isLight = _themeMode == ThemeMode.light;
-        final scheme = isDark
-            ? (darkDynamic ??
-                  ColorScheme.fromSeed(
-                    seedColor: const Color(0xFF5C6BC0),
-                    brightness: Brightness.dark,
-                  ))
-            : (lightDynamic ??
-                  ColorScheme.fromSeed(
-                    seedColor: const Color(0xFF5C6BC0),
-                    brightness: Brightness.light,
-                  ));
-
-        debugPrint(
-          '[ClasshubApp] isDark=$isDark, isLight=$isLight, scheme brightness=${scheme.brightness}',
-        );
-
         return MaterialApp(
           title: 'ClassHub',
           debugShowCheckedModeBanner: false,
@@ -95,7 +70,7 @@ class _ClasshubAppState extends State<ClasshubApp> {
           home: widget.isSetupComplete
               ? MainScreen(
                   rootPath: widget.rootPath,
-                  onThemeChanged: updateTheme,
+                  initialThemeMode: _themeMode,
                 )
               : const LandingPage1(),
         );

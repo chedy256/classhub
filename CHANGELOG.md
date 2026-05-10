@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.2.5 - 2026-05-10
+
+### Fixed
+
+- Theme toggle not working on first app launch (missing callback in onboarding flow)
+- External storage path now resolved dynamically instead of hardcoded
+- Removed 500ms delay before showing What's New dialog
+
+### Added
+
+- README, LICENSE, and contributor credits
+
+---
+
 ## v1.2.4 - 2026-05-10
 
 ### Added
