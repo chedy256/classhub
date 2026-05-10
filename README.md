@@ -4,13 +4,13 @@
 
 # ClassHub
 
+### File fetcher for Android
+
 <br/>
 
 [![Latest release](https://img.shields.io/github/v/release/ClassHubTeam/classhub?style=for-the-badge&labelColor=0d1117)](https://github.com/ClassHubTeam/classhub/releases)
 [![License](https://img.shields.io/github/license/ClassHubTeam/classhub?style=for-the-badge&labelColor=0d1117)](https://github.com/ClassHubTeam/classhub/blob/main/LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/ClassHubTeam/classhub/total?style=for-the-badge&labelColor=0d1117)](https://github.com/ClassHubTeam/classhub/releases)
-
-<b>File fetcher for Android</b>
 
 [classhub.knisium.com](https://classhub.knisium.com)
 
