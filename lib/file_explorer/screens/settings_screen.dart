@@ -1,11 +1,15 @@
 import 'package:classhub/core/services/classhub_storage_service.dart';
+import 'package:classhub/main.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
 class SettingsScreen extends StatefulWidget {
-  final void Function(ThemeMode)? onThemeChanged;
+  final ThemeMode initialThemeMode;
 
-  const SettingsScreen({super.key, this.onThemeChanged});
+  const SettingsScreen({
+    super.key,
+    required this.initialThemeMode,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -13,22 +17,21 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _currentPath = '';
-  ThemeMode _themeMode = ThemeMode.system;
+  late ThemeMode _themeMode;
   String _githubToken = '';
 
   @override
   void initState() {
     super.initState();
+    _themeMode = widget.initialThemeMode;
     _loadData();
   }
 
   Future<void> _loadData() async {
     final path = await ClasshubStorageService.getPath();
-    final theme = await ClasshubStorageService.getThemeMode();
     final token = await ClasshubStorageService.getGithubToken();
     setState(() {
       _currentPath = path ?? '';
-      _themeMode = theme;
       _githubToken = token ?? '';
     });
   }
@@ -47,11 +50,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _changeTheme(ThemeMode mode) async {
-    debugPrint('[Settings] _changeTheme: mode=$mode');
     await ClasshubStorageService.saveThemeMode(mode);
     setState(() => _themeMode = mode);
-    debugPrint('[Settings] calling onThemeChanged callback');
-    widget.onThemeChanged?.call(mode);
+    context.findAncestorStateOfType<ClasshubAppState>()?.updateTheme(mode);
   }
 
   Future<void> _editGithubToken() async {
