@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.2.4 - 2026-05-10
+
+### Added
+
+- "What's New" bottom sheet shown on first launch after each update
+- Rendered changelog using flutter_markdown for proper headers, lists, and formatting
+- Animated moving wave progress indicator (later replaced with simple divider)
+- Version tracking via SharedPreferences to detect updates
+
+### Changed
+
+- Rename dialog now pre-fills the current filename
+
+### Internal
+
+- Added `flutter_markdown` dependency for markdown rendering
+- Added `ClasshubStorageService.getLastSeenVersion()` / `saveLastSeenVersion()`
+- Added `changelog_service.dart` with `loadFullChangelog()` and `showWhatsNewDialog()`
+
+---
+
 ## v1.2.3 - 2026-05-09
 
 ### Added

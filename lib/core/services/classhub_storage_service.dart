@@ -9,6 +9,7 @@ class ClasshubStorageService {
   static const String _themeKey = 'classhub_theme_mode';
   static const String _githubTokenKey = 'classhub_github_token';
   static const String _lastUpdateCheckKey = 'classhub_last_update_check';
+  static const String _lastSeenVersionKey = 'classhub_last_seen_version';
 
   static Future<String?> getPath() async {
     final prefs = await SharedPreferences.getInstance();
@@ -81,5 +82,15 @@ class ClasshubStorageService {
   static Future<void> saveLastUpdateCheck(DateTime time) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_lastUpdateCheckKey, time.millisecondsSinceEpoch);
+  }
+
+  static Future<String?> getLastSeenVersion() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_lastSeenVersionKey);
+  }
+
+  static Future<void> saveLastSeenVersion(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_lastSeenVersionKey, version);
   }
 }
