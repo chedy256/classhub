@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/version.dart';
 import '../../core/services/update_checker.dart';
 import '../../core/services/update_installer.dart';
+import '../../core/services/changelog_service.dart';
 
 enum _UpdateState { checking, available, downloading, installing, error, none }
 
@@ -138,6 +139,13 @@ class _AboutScreenState extends State<AboutScreen> {
           ),
           const SizedBox(height: 32),
           ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('Changelog'),
+            subtitle: Text('v$appVersion'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _showChangelog,
+          ),
+          ListTile(
             leading: const Icon(Icons.code),
             title: const Text('Source code'),
             subtitle: const Text('GitHub repository'),
@@ -265,5 +273,11 @@ class _AboutScreenState extends State<AboutScreen> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
+  }
+
+  Future<void> _showChangelog() async {
+    final changelog = await loadFullChangelog();
+    if (!mounted || changelog.isEmpty) return;
+    showWhatsNewDialog(context, appVersion, changelog);
   }
 }

@@ -104,7 +104,10 @@ class _MainScreenState extends State<MainScreen>
 
   Future<void> _showWhatsNewIfNeeded() async {
     final lastSeen = await ClasshubStorageService.getLastSeenVersion();
-    if (lastSeen == null || lastSeen == appVersion) return;
+    if (lastSeen == null) {
+      await ClasshubStorageService.saveLastSeenVersion(appVersion);
+      return;
+    } else if (lastSeen == appVersion) return;
     await ClasshubStorageService.saveLastSeenVersion(appVersion);
 
     final changelog = await loadFullChangelog();
