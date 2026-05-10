@@ -140,7 +140,7 @@ flutter build apk --debug
 Built by the **Classhub team**, by students for students.
 
 <a href="https://github.com/ClassHubTeam/classhub/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=ClassHubTeam/classhub" alt="Contributors"/>
+  <img src="https://contrib.rocks/image?repo=ClassHubTeam/classhub&v=1" alt="Contributors"/>
 </a>
 
 </div>
