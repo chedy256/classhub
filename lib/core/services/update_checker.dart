@@ -7,11 +7,13 @@ class UpdateInfo {
   final String latestVersion;
   final String releaseUrl;
   final String apkUrl;
+  final String? checksumUrl;
 
   UpdateInfo({
     required this.latestVersion,
     required this.releaseUrl,
     required this.apkUrl,
+    this.checksumUrl,
   });
 }
 
@@ -43,10 +45,15 @@ Future<UpdateInfo?> checkForUpdate() async {
     if (tagName.isEmpty || htmlUrl.isEmpty) return null;
 
     String apkUrl = '';
+    String? checksumUrl;
     for (final asset in assets) {
-      if (asset is Map && (asset['name'] as String? ?? '') == 'classhub.apk') {
-        apkUrl = asset['browser_download_url'] as String? ?? '';
-        break;
+      if (asset is Map) {
+        final name = asset['name'] as String? ?? '';
+        if (name == 'classhub.apk') {
+          apkUrl = asset['browser_download_url'] as String? ?? '';
+        } else if (name == 'classhub.apk.sha256') {
+          checksumUrl = asset['browser_download_url'] as String? ?? '';
+        }
       }
     }
 
@@ -59,6 +66,7 @@ Future<UpdateInfo?> checkForUpdate() async {
         latestVersion: latestVersion,
         releaseUrl: htmlUrl,
         apkUrl: apkUrl,
+        checksumUrl: checksumUrl,
       );
     }
 

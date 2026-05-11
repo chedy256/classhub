@@ -10,6 +10,7 @@ class MainActivity : FlutterActivity() {
 
     private val CHANNEL = "com.knisium.classhub/sync_service"
     private val STORAGE_CHANNEL = "com.knisium.classhub/storage"
+    private val INSTALL_CHANNEL = "com.knisium.classhub/apk_install"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -18,6 +19,36 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "getExternalStorageDirectory" -> {
                     result.success(Environment.getExternalStorageDirectory()?.absolutePath)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INSTALL_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "installApk" -> {
+                    val path = call.argument<String>("path")
+                    if (path == null) {
+                        result.error("INVALID_ARG", "path is required", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val file = java.io.File(path)
+                        val apkUri = androidx.core.content.FileProvider.getUriForFile(
+                            this,
+                            "$packageName.fileprovider",
+                            file
+                        )
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(apkUri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("INSTALL_FAILED", e.message, null)
+                    }
                 }
                 else -> result.notImplemented()
             }

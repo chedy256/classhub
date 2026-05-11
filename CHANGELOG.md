@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.7 - 2026-05-11
+
+### Fixed
+
+- APK integrity verified via SHA-256 checksum after download, preventing corrupted installs
+- APK installation uses native platform channel instead of `open_file`, fixing "problem parsing the package" error on many devices
+- APK temp file no longer deleted before package installer finishes reading it
+- Orphaned `.apk` files cleaned up on app startup
+
+---
+
 ## v1.2.6 - 2026-05-11
 
 ### Fixed

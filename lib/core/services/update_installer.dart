@@ -1,7 +1,8 @@
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/sync_foreground_service.dart';
@@ -12,6 +13,7 @@ class UpdateInstaller {
 
   Future<String?> downloadApk(
     String apkUrl, {
+    String? checksumUrl,
     void Function(double progress)? onProgress,
   }) async {
     if (_isDownloading) {
@@ -84,6 +86,16 @@ class UpdateInstaller {
           }
         }
 
+        if (checksumUrl != null) {
+          final valid = await _verifyChecksum(apkFile, checksumUrl);
+          if (!valid) {
+            debugPrint('[UpdateInstaller] Checksum mismatch, deleting');
+            await apkFile.delete();
+            _nativeService.stop();
+            return null;
+          }
+        }
+
         _nativeService.update(
           percent: 100,
           currentFile: 'Download complete',
@@ -112,6 +124,35 @@ class UpdateInstaller {
     }
   }
 
+  Future<bool> _verifyChecksum(File file, String checksumUrl) async {
+    try {
+      final response = await http.get(Uri.parse(checksumUrl)).timeout(
+        const Duration(seconds: 10),
+      );
+      if (response.statusCode != 200) {
+        debugPrint('[UpdateInstaller] Failed to fetch checksum: ${response.statusCode}');
+        return true;
+      }
+
+      final expected = response.body.trim().split(RegExp(r'\s+')).first;
+      if (expected.isEmpty) {
+        debugPrint('[UpdateInstaller] Empty checksum from server');
+        return true;
+      }
+
+      final bytes = await file.readAsBytes();
+      final hash = sha256.convert(bytes).toString();
+
+      debugPrint('[UpdateInstaller] Expected: $expected');
+      debugPrint('[UpdateInstaller] Actual:   $hash');
+
+      return hash == expected;
+    } catch (e) {
+      debugPrint('[UpdateInstaller] Checksum verification error: $e');
+      return true;
+    }
+  }
+
   Future<bool> _checkInstallPermission() async {
     if (!Platform.isAndroid) return true;
 
@@ -122,6 +163,8 @@ class UpdateInstaller {
     return result.isGranted;
   }
 
+  static const _installChannel = MethodChannel('com.knisium.classhub/apk_install');
+
   Future<bool> install(String apkPath) async {
     debugPrint('[UpdateInstaller] Installing: $apkPath');
 
@@ -131,23 +174,13 @@ class UpdateInstaller {
       return false;
     }
 
-    final result = await OpenFile.open(apkPath);
-    debugPrint('[UpdateInstaller] Install result: ${result.type} - ${result.message}');
-
-    final success = result.type == ResultType.done;
-
-    if (success) {
-      try {
-        final file = File(apkPath);
-        if (file.existsSync()) {
-          await file.delete();
-          debugPrint('[UpdateInstaller] APK cleaned up');
-        }
-      } catch (e) {
-        debugPrint('[UpdateInstaller] Cleanup failed: $e');
-      }
+    try {
+      await _installChannel.invokeMethod('installApk', {'path': apkPath});
+      debugPrint('[UpdateInstaller] Install intent sent');
+      return true;
+    } catch (e) {
+      debugPrint('[UpdateInstaller] Install failed: $e');
+      return false;
     }
-
-    return success;
   }
 }

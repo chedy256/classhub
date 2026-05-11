@@ -97,7 +97,7 @@ class _MainScreenState extends State<MainScreen>
       final dir = await getTemporaryDirectory();
       final entries = dir.listSync();
       for (final entry in entries) {
-        if (entry is File && entry.path.endsWith('.zip')) {
+        if (entry is File && (entry.path.endsWith('.zip') || entry.path.endsWith('.apk'))) {
           try {
             entry.deleteSync();
           } catch (_) {}

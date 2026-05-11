@@ -49,6 +49,7 @@ class _AboutScreenState extends State<AboutScreen> {
 
     final path = await installer.downloadApk(
       _updateInfo!.apkUrl,
+      checksumUrl: _updateInfo!.checksumUrl,
       onProgress: (progress) {
         if (mounted) {
           setState(() => _downloadProgress = progress);
