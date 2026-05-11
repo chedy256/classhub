@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.6 - 2026-05-11
+
+### Fixed
+
+- Default directory now created on disk during onboarding after storage permission is granted, preventing infinite onboarding loop on newly installed devices
+
+---
+
 ## v1.2.5 - 2026-05-10
 
 ### Fixed

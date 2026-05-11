@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:classhub/core/services/classhub_storage_service.dart';
 import 'package:classhub/core/services/storage_permission_service.dart';
@@ -89,6 +91,21 @@ class _FolderSelectionWrapperState extends State<FolderSelectionWrapper> {
       setState(() {
         _isCompleting = false;
         _error = 'Storage permission is required.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
+    try {
+      final dir = Directory(_selectedPath!);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+    } catch (e) {
+      setState(() {
+        _isCompleting = false;
+        _error = 'Failed to create directory: $e';
       });
       return;
     }
