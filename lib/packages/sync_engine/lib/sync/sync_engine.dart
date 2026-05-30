@@ -23,8 +23,9 @@ import 'sources/github/http_client.dart';
 // import 'sources/classroom/syncer.dart';
 // import 'sources/classroom/parser.dart';
 //
-// import 'sources/drive/syncer.dart';
-// import 'sources/drive/parser.dart';
+import 'sources/drive/drive_syncer.dart';
+import 'sources/drive/drive_parser.dart';
+import 'sources/drive/http_client.dart';
 
 String _generateSyncId() {
   final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -43,6 +44,7 @@ class SyncEngine {
   final List<SourceParser> _parsers;
   final Map<SourceType, SourceSyncer> _syncers;
   final SyncProgressCallback? onProgress;
+  final String? googleApiKey;
 
   SyncEngine({
     required this.appFolder,
@@ -56,14 +58,25 @@ class SyncEngine {
     List<SourceParser>? parsers,
     Map<SourceType, SourceSyncer>? syncers,
     this.onProgress,
+    this.googleApiKey,
   }) : _sourceStore = sourceStore ?? SourceStore(),
        _fileWriter = fileWriter ?? FileWriter(),
        _queueService = queueService ?? SyncQueueService(),
        _lockService = lockService ?? LockService(),
-       _parsers = parsers ?? [GithubParser(HttpClient(token: githubToken))],
+       _parsers =
+           parsers ??
+           [
+             GithubParser(HttpClient(token: githubToken)),
+             DriveParser(DriveApiClient(apiKey: googleApiKey)),
+           ],
        _syncers =
            syncers ??
-           {SourceType.github: GithubSyncer(HttpClient(token: githubToken))};
+           {
+             SourceType.github: GithubSyncer(HttpClient(token: githubToken)),
+             SourceType.drive: DriveSyncer(
+               DriveApiClient(apiKey: googleApiKey),
+             ),
+           };
 
   /// Scans a root directory for sources with interrupted syncs.
   ///
@@ -117,9 +130,17 @@ class SyncEngine {
       }
 
       final config = await parser.parseUrlToSourceConfig(url);
+      print(
+        '[DEBUG] addSource: URL="$url" config.type=${config.type} config.folderId="${config.folderId}" config.toJson()=${config.toJson()}',
+      );
 
       await sourceFolder.create(recursive: true);
       await _sourceStore.write(sourceFolder, config);
+
+      final readBack = await _sourceStore.read(sourceFolder);
+      print(
+        '[DEBUG] addSource: read back config.folderId="${readBack.folderId}" config.toJson()=${readBack.toJson()}',
+      );
 
       return await _performSync(
         sourceFolder,
@@ -210,6 +231,9 @@ class SyncEngine {
 
       await _sourceStore.updateStatus(sourceFolder, SyncStatus.syncing);
       final config = await _sourceStore.read(sourceFolder);
+      print(
+        '[DEBUG] _performSync: after updateStatus+read config.folderId="${config.folderId}" config.toJson()=${config.toJson()}',
+      );
 
       final syncId = existingQueue?.syncId ?? _generateSyncId();
       final String? checkpoint;
@@ -222,7 +246,7 @@ class SyncEngine {
         final syncer = _getSyncerForType(config.type);
         final output = await syncer.getDeltas(config);
         checkpoint = output.checkpoint;
-        queue = _buildQueueFromDeltas(syncId, output.deltas, checkpoint);
+        queue = _buildQueueFromDeltas(syncId, output.deltas, checkpoint ?? '');
       }
 
       await _queueService.write(sourceFolder, queue);
@@ -242,6 +266,7 @@ class SyncEngine {
           type: _deltaTypeFromString(queueDelta.operation ?? 'add'),
           downloadUrl: queueDelta.downloadUrl,
           size: queueDelta.size,
+          downloadHeaders: queueDelta.downloadHeaders,
         );
         deltasToApply.add(delta);
       }
@@ -333,24 +358,22 @@ class SyncEngine {
   SyncQueue _buildQueueFromDeltas(
     String syncId,
     List<FileDelta> deltas,
-    String? checkpoint,
+    String checkpoint,
   ) {
-    final queueDeltas = deltas.map((delta) {
-      return SyncQueueDelta(
-        relativePath: delta.relativePath,
-        status: DeltaStatus.pending,
-        downloadUrl: delta.downloadUrl,
-        operation: delta.type.name,
-        size: delta.size,
-      );
-    }).toList();
-
     return SyncQueue(
       syncId: syncId,
       startedAt: DateTime.now().toUtc(),
-      deltas: queueDeltas,
       checkpoint: checkpoint,
-      totalDeltas: queueDeltas.length,
+      deltas: deltas.map((d) {
+        return SyncQueueDelta(
+          relativePath: d.relativePath,
+          status: DeltaStatus.pending,
+          downloadUrl: d.downloadUrl,
+          operation: d.type.name,
+          size: d.size,
+          downloadHeaders: d.downloadHeaders,
+        );
+      }).toList(),
     );
   }
 

@@ -55,7 +55,14 @@ class SourceStore {
   /// Convenience: update only sync_status (called at sync start/on error).
   Future<void> updateStatus(Directory sourceFolder, SyncStatus status) async {
     final config = await read(sourceFolder);
-    await write(sourceFolder, config.copyWith(syncStatus: status));
+    print(
+      '[DEBUG] SourceStore.updateStatus: before copyWith config.folderId="${config.folderId}" config.toJson()=${config.toJson()}',
+    );
+    final updated = config.copyWith(syncStatus: status);
+    print(
+      '[DEBUG] SourceStore.updateStatus: after copyWith folderId="${updated.folderId}" updated.toJson()=${updated.toJson()}',
+    );
+    await write(sourceFolder, updated);
   }
 
   /// Convenience: stamp a successful sync.

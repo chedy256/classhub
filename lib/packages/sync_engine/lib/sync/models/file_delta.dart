@@ -7,12 +7,14 @@ class FileDelta {
   final String? downloadUrl; // null for deletes
   final DeltaType type;
   final int? size; // in bytes, null when unknown (incremental diff)
+  final Map<String, String>? downloadHeaders; // Auth headers for download
 
   const FileDelta({
     required this.relativePath,
     required this.type,
     this.downloadUrl,
     this.size,
+    this.downloadHeaders,
   }) : assert(
          type == DeltaType.delete || downloadUrl != null,
          'downloadUrl is required for add/update deltas',

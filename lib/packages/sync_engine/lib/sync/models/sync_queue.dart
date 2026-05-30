@@ -10,6 +10,7 @@ class SyncQueueDelta {
   final String? downloadUrl; // null for deletes
   final String? operation; // 'add', 'update', 'delete'
   final int? size; // in bytes, null when unknown
+  final Map<String, String>? downloadHeaders; // Auth headers for download
 
   const SyncQueueDelta({
     required this.relativePath,
@@ -17,35 +18,48 @@ class SyncQueueDelta {
     this.downloadUrl,
     this.operation,
     this.size,
+    this.downloadHeaders,
   });
+
+  Map<String, dynamic> toJson() => {
+    'relative_path': relativePath,
+    'status': status.name,
+    'download_url': downloadUrl,
+    'operation': operation,
+    'size': size,
+    if (downloadHeaders != null) 'download_headers': downloadHeaders,
+  };
 
   factory SyncQueueDelta.fromJson(Map<String, dynamic> json) {
     return SyncQueueDelta(
       relativePath: json['relative_path'] as String,
-      status: DeltaStatus.values.byName(json['status'] as String),
+      status: DeltaStatus.values.firstWhere(
+        (e) => e.name == json['status'],
+        orElse: () => DeltaStatus.pending,
+      ),
       downloadUrl: json['download_url'] as String?,
       operation: json['operation'] as String?,
       size: json['size'] as int?,
+      downloadHeaders: (json['download_headers'] as Map<String, dynamic>?)
+          ?.map((k, v) => MapEntry(k, v.toString())),
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'relative_path': relativePath,
-      'status': status.name,
-      'download_url': downloadUrl,
-      'operation': operation,
-      'size': size,
-    };
-  }
-
-  SyncQueueDelta copyWith({DeltaStatus? status}) {
+  SyncQueueDelta copyWith({
+    String? relativePath,
+    DeltaStatus? status,
+    String? downloadUrl,
+    String? operation,
+    int? size,
+    Map<String, String>? downloadHeaders,
+  }) {
     return SyncQueueDelta(
-      relativePath: relativePath,
+      relativePath: relativePath ?? this.relativePath,
       status: status ?? this.status,
-      downloadUrl: downloadUrl,
-      operation: operation,
-      size: size,
+      downloadUrl: downloadUrl ?? this.downloadUrl,
+      operation: operation ?? this.operation,
+      size: size ?? this.size,
+      downloadHeaders: downloadHeaders ?? this.downloadHeaders,
     );
   }
 }
