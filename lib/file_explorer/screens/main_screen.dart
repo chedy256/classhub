@@ -508,6 +508,7 @@ class _MainScreenState extends State<MainScreen>
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const Divider(),
