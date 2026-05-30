@@ -7,7 +7,7 @@ extension SourceTypeIcon on SourceType? {
     return (switch (this) {
       SourceType.github => FontAwesomeIcons.github,
       SourceType.drive => FontAwesomeIcons.googleDrive,
-      SourceType.classroom => FontAwesomeIcons.school,
+      SourceType.classroom => FontAwesomeIcons.graduationCap,
       null => FontAwesomeIcons.folder,
     });
   }
