@@ -10,6 +10,7 @@ environment:
 dependencies:
   archive: ^4.0.9
   http: ^1.6.0
+  package_info_plus: ^10.1.0
   path: ^1.9.1
 
 dev_dependencies:
