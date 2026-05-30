@@ -28,7 +28,11 @@ class FailingHttpClient implements http.Client {
       throw SocketException('Simulated crash after $failAfterCount downloads');
     }
     final response = http.Response('content for $_requestCount', 200);
-    return http.StreamedResponse(Stream.value(response.bodyBytes), 200, request: request);
+    return http.StreamedResponse(
+      Stream.value(response.bodyBytes),
+      200,
+      request: request,
+    );
   }
 
   @override
@@ -88,7 +92,11 @@ class MockHttpClient implements http.Client {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final response = http.Response('content', 200);
-    return http.StreamedResponse(Stream.value(response.bodyBytes), 200, request: request);
+    return http.StreamedResponse(
+      Stream.value(response.bodyBytes),
+      200,
+      request: request,
+    );
   }
 
   @override

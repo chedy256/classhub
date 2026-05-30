@@ -11,7 +11,7 @@ class HttpClient {
 
   /// [token] is optional. Without it, GitHub allows 60 requests/hour.
   /// With a personal access token, the limit rises to 5000/hour.
-  HttpClient({String? token, http.Client? client}) 
+  HttpClient({String? token, http.Client? client})
     : _token = token,
       _client = client ?? http.Client();
 
@@ -35,6 +35,8 @@ class HttpClient {
       );
     }
 
-    return await Isolate.run(() => jsonDecode(response.body) as Map<String, dynamic>);
+    return await Isolate.run(
+      () => jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 }

@@ -13,6 +13,8 @@ extension SourceTypeIcon on SourceType? {
   }
 
   Widget iconWidget({double size = 24, Color? color}) {
-    return Center(child: FaIcon(icon, size: size, color: color));
+    return Center(
+      child: FaIcon(icon, size: size, color: color),
+    );
   }
 }
