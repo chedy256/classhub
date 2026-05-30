@@ -1,11 +1,13 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ClasshubStorageService {
+  static String? _googleApiKey;
   static const String _pathKey = 'classhub_root_path';
   static const String _themeKey = 'classhub_theme_mode';
   static const _storageChannel = MethodChannel('com.knisium.classhub/storage');
@@ -101,4 +103,28 @@ class ClasshubStorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastSeenVersionKey, version);
   }
+
+  // Keys are bundeled in the app builder:
+  /* flutter build apk \
+  --dart-define=ANDROID_DRIVE_KEY=your_android_key \
+  --dart-define=IOS_DRIVE_KEY=your_ios_key
+  */
+  static Future<void> loadEnvFromAssets() async {
+    try {
+      if (Platform.isAndroid) {
+        _googleApiKey = const String.fromEnvironment('ANDROID_DRIVE_KEY');
+        if (_googleApiKey!.isEmpty) _googleApiKey = null;
+        return;
+      } else if (Platform.isIOS) {
+        _googleApiKey = const String.fromEnvironment('IOS_DRIVE_KEY');
+        if (_googleApiKey!.isEmpty) _googleApiKey = null;
+        return;
+      } else if (kDebugMode) {
+        print("No API key found for this platform");
+      }
+      _googleApiKey = null;
+    } catch (_) {}
+  }
+
+  static String? getGoogleApiKey() => _googleApiKey;
 }

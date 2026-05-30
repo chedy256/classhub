@@ -41,7 +41,7 @@ Classhub is a free and open source Android app that fetches files from remote so
 ### Fetch
 
 - GitHub repos (fully supported)
-- Google Drive (planned)
+- Google Drive (supportted but not fully tested yet)
 - Google Classroom (planned)
 
 </td>
@@ -123,14 +123,17 @@ Requires [Nix](https://nixos.org/download) with flakes enabled.
 
 </div>
 
-```
+```bash
 git clone https://github.com/ClassHubTeam/classhub.git
 cd classhub
 nix develop
 flutter pub get
-flutter build apk --debug
+flutter build apk --debug \
+--dart-define=ANDROID_DRIVE_KEY=your_android_key \
+--dart-define=IOS_DRIVE_KEY=your_ios_key
 ```
 
+> the `ANDROID_DRIVE_KEY` and `IOS_DRIVE_KEY` are for Google Drive support. You can ignore them or you can get your own keys from the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) if you want to test Google Drive support.
 
 <br/>
 
@@ -152,7 +155,7 @@ Built by the **Classhub team**, by students for students.
 
 ## License
 
-Classhub is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Classhub is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation version 3 of the License.
 
 See the [LICENSE](LICENSE) file for details.
 

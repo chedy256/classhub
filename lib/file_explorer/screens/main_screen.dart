@@ -212,6 +212,7 @@ class _MainScreenState extends State<MainScreen>
     final syncEngine = SyncEngine(
       appFolder: Directory(widget.rootPath),
       githubToken: await ClasshubStorageService.getGithubToken(),
+      googleApiKey: ClasshubStorageService.getGoogleApiKey(),
       onProgress: (progress) {
         if (!mounted) return;
         if (firstProgress) {
