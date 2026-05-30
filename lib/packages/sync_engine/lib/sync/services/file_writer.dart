@@ -110,7 +110,8 @@ class FileWriter {
     // Create parent directories (e.g. "assignments/week1/") if they don't exist
     await file.parent.create(recursive: true);
 
-    final response = await _httpClient.get(Uri.parse(downloadUrl));
+    final request = http.Request('GET', Uri.parse(downloadUrl));
+    final response = await _httpClient.send(request);
 
     if (response.statusCode != 200) {
       throw HttpException(
@@ -119,7 +120,9 @@ class FileWriter {
       );
     }
 
-    await file.writeAsBytes(response.bodyBytes);
+    final sink = file.openWrite();
+    await response.stream.pipe(sink);
+    await sink.close();
   }
 
   Future<void> _deleteFile(Directory targetFolder, String relativePath) async {
