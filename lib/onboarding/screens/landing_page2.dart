@@ -26,25 +26,25 @@ class LandingPage2 extends StatelessWidget {
                 ),
               ),
               const Spacer(flex: 1),
-              _FeatureCard(
+              const _FeatureCard(
                 title: 'Simple by Design',
                 description: 'Minimal and intuitive.',
                 icon: Icons.check_circle_outline,
               ),
               const SizedBox(height: 16),
-              _FeatureCard(
+              const _FeatureCard(
                 title: 'Offline First',
                 description: 'Works entirely on your device.',
                 icon: Icons.cloud_off_outlined,
               ),
               const SizedBox(height: 16),
-              _FeatureCard(
+              const _FeatureCard(
                 title: 'Privacy Guaranteed',
                 description: 'Your data stays where it belongs.',
                 icon: Icons.lock_outline_rounded,
               ),
               const SizedBox(height: 16),
-              _FeatureCard(
+              const _FeatureCard(
                 title: 'Open Source',
                 description: 'Free and open source software.',
                 icon: Icons.code,

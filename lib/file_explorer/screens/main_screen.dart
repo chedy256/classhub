@@ -334,7 +334,7 @@ class _MainScreenState extends State<MainScreen>
 
   Future<void> _uploadFiles() async {
     _toggleFab();
-    final result = await FilePicker.pickFiles(allowMultiple: true);
+    final result = await FilePicker.pickFiles();
     if (result != null && result.files.isNotEmpty) {
       final paths = result.files
           .where((pf) => pf.path != null)
@@ -508,6 +508,7 @@ class _MainScreenState extends State<MainScreen>
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const Divider(),
@@ -1240,7 +1241,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
 
   Future<void> _uploadFiles() async {
     _toggleFab();
-    final result = await FilePicker.pickFiles(allowMultiple: true);
+    final result = await FilePicker.pickFiles();
     if (result != null && result.files.isNotEmpty) {
       final paths = result.files
           .where((pf) => pf.path != null)
@@ -1392,6 +1393,12 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final sourceConfig = _fileExplorerService.getSourceConfig(
+      widget.folderPath,
+    );
+    final lastSynced = _fileExplorerService.formatLastSynced(
+      sourceConfig?.lastSyncedAt,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -1401,56 +1408,53 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
               ? _cancelSelection
               : () => Navigator.pop(context),
         ),
-        title: ValueListenableBuilder<Map<String, SyncProgress>>(
-          valueListenable: widget.syncTracker?.progress ?? ValueNotifier({}),
-          builder: (context, syncProgress, _) {
-            final progress = syncProgress[widget.folderPath];
-            final sourceConfig = _fileExplorerService.getSourceConfig(
-              widget.folderPath,
-            );
-            final lastSynced = _fileExplorerService.formatLastSynced(
-              sourceConfig?.lastSyncedAt,
-            );
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _isSelecting
-                          ? '${_selectedIndices.length} selected'
-                          : p.basename(widget.folderPath),
-                    ),
-                    if (sourceConfig != null && !_isSelecting) ...[
-                      const SizedBox(width: 6),
-                      sourceConfig.type.iconWidget(
-                        size: 18,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ],
+                Text(
+                  _isSelecting
+                      ? '${_selectedIndices.length} selected'
+                      : p.basename(widget.folderPath),
                 ),
-                if (progress != null && !_isSelecting)
-                  Text(
+                if (sourceConfig != null && !_isSelecting) ...[
+                  const SizedBox(width: 6),
+                  sourceConfig.type.iconWidget(
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ],
+            ),
+            ValueListenableBuilder<Map<String, SyncProgress>>(
+              valueListenable:
+                  widget.syncTracker?.progress ?? ValueNotifier({}),
+              builder: (context, syncProgress, _) {
+                final progress = syncProgress[widget.folderPath];
+                if (progress != null && !_isSelecting) {
+                  return Text(
                     syncProgressText(progress),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.primary,
                     ),
-                  )
-                else if (lastSynced != null &&
+                  );
+                } else if (lastSynced != null &&
                     sourceConfig != null &&
-                    !_isSelecting)
-                  Text(
+                    !_isSelecting) {
+                  return Text(
                     'Synced $lastSynced',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
-                  ),
-              ],
-            );
-          },
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
         ),
         actions: _isSelecting
             ? [
@@ -1870,6 +1874,11 @@ class _PropertiesDialog extends StatefulWidget {
 }
 
 class _PropertiesDialogState extends State<_PropertiesDialog> {
+  static const _labelStyle = TextStyle(
+    fontWeight: FontWeight.w600,
+    fontSize: 13,
+  );
+
   int? _size;
   Map<String, dynamic>? _config;
 
@@ -1991,9 +2000,7 @@ class _PropertiesDialogState extends State<_PropertiesDialog> {
             width: 80,
             child: Text(
               label,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+              style: _labelStyle.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
