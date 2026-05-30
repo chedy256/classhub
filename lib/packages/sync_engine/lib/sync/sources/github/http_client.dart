@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 
@@ -34,6 +35,6 @@ class HttpClient {
       );
     }
 
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return await Isolate.run(() => jsonDecode(response.body) as Map<String, dynamic>);
   }
 }
