@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class StoragePermissionService {
   /// check the storage permission
   static Future<bool> hasPermission() async {
+    if (kIsWeb) return true;
     // iOS and desktop don't need explicit storage permission
     if (!Platform.isAndroid) return true;
 
@@ -13,6 +15,7 @@ class StoragePermissionService {
 
   /// ask for storage permission
   static Future<bool> requestPermission() async {
+    if (kIsWeb) return true;
     if (!Platform.isAndroid) return true;
 
     final status = await Permission.manageExternalStorage.request();
