@@ -16,6 +16,7 @@ import 'settings_screen.dart';
 import 'trash_screen.dart';
 import 'support_screen.dart';
 import 'about_screen.dart';
+import 'markdown_preview_screen.dart';
 import 'package:classhub/share/screens/add_screen.dart';
 import 'package:classhub/share/services/deep_link_service.dart';
 import '../../core/version.dart';
@@ -719,7 +720,20 @@ class _MainScreenState extends State<MainScreen>
                                       );
                                       _loadEntries();
                                     }
-                                  : () => OpenFile.open(entity.path),
+                                  : () {
+                                      if (entity.path.toLowerCase().endsWith('.md')) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => MarkdownPreviewScreen(
+                                              filePath: entity.path,
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        OpenFile.open(entity.path);
+                                      }
+                                    },
                               onLongPress: () {
                                 if (!_isSelecting) {
                                   setState(() {
