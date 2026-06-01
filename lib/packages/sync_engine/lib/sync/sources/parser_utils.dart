@@ -1,7 +1,8 @@
 import 'source_parser.dart';
 import 'github/parser.dart';
+import 'drive/drive_parser.dart';
 
-final List<SourceParser> _allParsers = [GithubParser()];
+final List<SourceParser> _allParsers = [GithubParser(), DriveParser()];
 
 String getSourceFolderName(String url) {
   for (final parser in _allParsers) {

@@ -19,6 +19,7 @@ class SourceConfig {
   final SyncStatus syncStatus;
   final DateTime? lastSyncedAt;
   final String? checkpoint; // in github the checkpoint is the last commit
+  final String? folderId; // for drive sources, the folder ID being synced
 
   /// The resolved branch name for this source.
   ///
@@ -36,6 +37,7 @@ class SourceConfig {
     this.lastSyncedAt,
     this.checkpoint,
     this.defaultBranch,
+    this.folderId,
   });
 
   /// Creates a [SourceConfig] from a JSON map.
@@ -50,6 +52,7 @@ class SourceConfig {
           : null,
       checkpoint: json['checkpoint'] as String?,
       defaultBranch: json['default_branch'] as String?,
+      folderId: json['folder_id'] as String?,
     );
   }
 
@@ -63,6 +66,7 @@ class SourceConfig {
       'last_synced_at': lastSyncedAt?.toUtc().toIso8601String(),
       'checkpoint': checkpoint,
       'default_branch': defaultBranch,
+      'folder_id': folderId,
     };
   }
 
@@ -72,6 +76,7 @@ class SourceConfig {
     DateTime? lastSyncedAt,
     String? checkpoint,
     String? defaultBranch,
+    String? folderId,
   }) {
     return SourceConfig(
       type: type,
@@ -81,6 +86,7 @@ class SourceConfig {
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
       checkpoint: checkpoint ?? this.checkpoint,
       defaultBranch: defaultBranch ?? this.defaultBranch,
+      folderId: folderId ?? this.folderId,
     );
   }
 }

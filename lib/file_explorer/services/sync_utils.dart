@@ -33,6 +33,7 @@ Future<void> performSync({
   final syncEngine = SyncEngine(
     appFolder: Directory(rootPath),
     githubToken: await ClasshubStorageService.getGithubToken(),
+    googleApiKey: ClasshubStorageService.getGoogleApiKey(),
     onProgress: (progress) {
       if (context.mounted) trackerCallback(progress);
     },

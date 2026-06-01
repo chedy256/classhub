@@ -18,7 +18,7 @@ A Dart package for pulling and syncing course material from remote sources (GitH
 | Source                | Status       |
 | --------------------- | ------------ |
 | GitHub (public repos) | -[x] Done    |
-| Google Drive          | -[ ] Planned |
+| Google Drive          | -[x] Done    |
 | Google Classroom      | -[ ] Planned |
 
 ---
@@ -27,7 +27,7 @@ A Dart package for pulling and syncing course material from remote sources (GitH
 
 The package is organized in 4 layers. Each layer only depends on the one below it.
 
-```
+```text
 ┌─────────────────────────────────┐
 │  4. SyncEngine (orchestrator)   │
 ├─────────────────────────────────┤
@@ -66,10 +66,10 @@ Each source folder gets a `.source/source.json` file that tracks its configurati
 
 ## Project structure
 
-```
+```text
 lib/
   sync_engine.dart
-  sync/
+  src/
     models/
       file_delta.dart
       source_config.dart
@@ -78,15 +78,26 @@ lib/
     services/
       file_writer.dart
       source_store.dart
-    sources/
+      http/
+        http_client.dart
+    sync/
+      sync_engine.dart
       source_parser.dart
       source_syncer.dart
+    sources/
       github/
-        http_client.dart
-        parser.dart
-        syncer.dart
-      drive/               # not implemented
-      classroom/           # not implemented
+        github_parser.dart
+        github_syncer.dart
+        github_client.dart
+      drive/
+        drive_parser.dart
+        drive_syncer.dart
+      classroom/
+        classroom_parser.dart
+        classroom_syncer.dart
+  utils/
+    logger.dart
+    path_utils.dart
 ```
 
 ---

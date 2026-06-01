@@ -69,6 +69,7 @@ class FileWriter {
               targetFolder,
               delta.relativePath,
               delta.downloadUrl!,
+              headers: delta.downloadHeaders,
             );
             added++;
             await onFileProgress?.call(delta.relativePath, 'add');
@@ -77,6 +78,7 @@ class FileWriter {
               targetFolder,
               delta.relativePath,
               delta.downloadUrl!,
+              headers: delta.downloadHeaders,
             );
             updated++;
             await onFileProgress?.call(delta.relativePath, 'update');
@@ -103,14 +105,18 @@ class FileWriter {
   Future<void> _writeFile(
     Directory targetFolder,
     String relativePath,
-    String downloadUrl,
-  ) async {
+    String downloadUrl, {
+    Map<String, String>? headers,
+  }) async {
     final file = _resolveFile(targetFolder, relativePath);
 
     // Create parent directories (e.g. "assignments/week1/") if they don't exist
     await file.parent.create(recursive: true);
 
     final request = http.Request('GET', Uri.parse(downloadUrl));
+    if (headers != null) {
+      request.headers.addAll(headers);
+    }
     final response = await _httpClient.send(request);
 
     if (response.statusCode != 200) {

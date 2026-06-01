@@ -301,10 +301,13 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _isSelecting
-                      ? '${_selectedIndices.length} selected'
-                      : p.basename(widget.folderPath),
+                Expanded(
+                  child: Text(
+                    _isSelecting
+                        ? '${_selectedIndices.length} selected'
+                        : p.basename(widget.folderPath),
+                        overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 if (sourceConfig != null && !_isSelecting) ...[
                   const SizedBox(width: 6),

@@ -11,6 +11,7 @@ import 'package:classhub/file_explorer/screens/main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ClasshubStorageService.loadEnvFromAssets();
   final (
     int savedThemeModeIndex,
     bool hasPermission,
