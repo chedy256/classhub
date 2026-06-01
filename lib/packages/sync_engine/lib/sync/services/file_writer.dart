@@ -110,16 +110,37 @@ class FileWriter {
     // Create parent directories (e.g. "assignments/week1/") if they don't exist
     await file.parent.create(recursive: true);
 
-    final response = await _httpClient.get(Uri.parse(downloadUrl));
+    final request = http.Request('GET', Uri.parse(downloadUrl));
+    final response = await _httpClient.send(request);
 
     if (response.statusCode != 200) {
+      // Drain the stream before throwing so the underlying socket is released
+      await response.stream.drain<void>();
       throw HttpException(
         'Download failed for $relativePath — '
         'GET $downloadUrl returned ${response.statusCode}',
       );
     }
 
-    await file.writeAsBytes(response.bodyBytes);
+    // Stream into a sibling temp file first. On success the temp file is
+    // atomically renamed over the target. On any failure the temp file is
+    // deleted, so the target is never left in a corrupt/truncated state even
+    // when apply() catches per-file errors and continues.
+    final tmp = File('${file.path}.tmp');
+    final sink = tmp.openWrite();
+    try {
+      await response.stream.pipe(sink);
+      // pipe() closes the sink on completion, but close() is idempotent so
+      // calling it here makes the happy path explicit and symmetrical.
+      await sink.close();
+      await tmp.rename(file.path);
+    } catch (e) {
+      // Ensure the sink is closed before attempting deletion; ignore secondary
+      // errors so the original exception is the one that propagates.
+      await sink.close().catchError((_) {});
+      await tmp.delete().catchError((_) => tmp);
+      rethrow;
+    }
   }
 
   Future<void> _deleteFile(Directory targetFolder, String relativePath) async {

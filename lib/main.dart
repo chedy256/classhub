@@ -11,11 +11,17 @@ import 'package:classhub/file_explorer/screens/main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  final savedPath = await ClasshubStorageService.getPath();
-  final savedThemeModeIndex = await ClasshubStorageService.getThemeModeIndex();
-  final savedThemeMode = ThemeMode.values[savedThemeModeIndex];
-  final hasPermission = await StoragePermissionService.hasPermission();
+  final (
+    int savedThemeModeIndex,
+    bool hasPermission,
+    String? savedPath,
+  ) = await (
+    ClasshubStorageService.getThemeModeIndex(),
+    StoragePermissionService.hasPermission(),
+    ClasshubStorageService.getPath(),
+  ).wait;
+  final savedThemeMode =
+      ThemeMode.values.elementAtOrNull(savedThemeModeIndex) ?? ThemeMode.system;
   final pathExists = savedPath != null && await Directory(savedPath).exists();
 
   runApp(

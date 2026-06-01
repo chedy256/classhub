@@ -34,7 +34,9 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  material_design_icons_flutter: ^7.0.7296
+  # dropped material design icons in favor of font awesome icons, as it is broken in Flutter 3.44.0 might revisit in the future when it is fixed
+  # material_design_icons_flutter: ^7.0.7296 
+  font_awesome_flutter: ^11.0.0
   dynamic_color: ^1.8.1
   file_picker: ^12.0.0-beta.3
   permission_handler: ^12.0.1
