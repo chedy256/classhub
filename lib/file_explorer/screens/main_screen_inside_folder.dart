@@ -457,10 +457,23 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                       ),
                                     ),
                                   );
-                                  _loadFiles();
-                                }
-                              : () => OpenFile.open(entity.path),
-                          onLongPress: () {
+                                   _loadFiles();
+                                 }
+                               : () {
+                                   if (entity.path.toLowerCase().endsWith('.md')) {
+                                     Navigator.push(
+                                       context,
+                                       MaterialPageRoute(
+                                         builder: (_) => MarkdownPreviewScreen(
+                                           filePath: entity.path,
+                                         ),
+                                       ),
+                                     );
+                                   } else {
+                                     OpenFile.open(entity.path);
+                                   }
+                                 },
+                           onLongPress: () {
                             if (!_isSelecting) {
                               setState(() {
                                 _isSelecting = true;
