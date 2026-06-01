@@ -67,6 +67,10 @@
             android:name=".SyncForegroundService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
+        <!-- HCPP: Hybrid Composition++ for better Platform View perf -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableHcpp"
+            android:value="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

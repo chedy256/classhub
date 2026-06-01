@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
+import '../../pdf_viewer/pdf_viewer_page.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -727,12 +728,24 @@ class _MainScreenState extends State<MainScreen>
                                       _loadEntries();
                                     }
                                   : () {
-                                      if (entity.path.toLowerCase().endsWith('.md')) {
+if (entity.path.toLowerCase().endsWith('.md')) {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
                                             builder: (_) => MarkdownPreviewScreen(
                                               filePath: entity.path,
+                                            ),
+                                          ),
+                                        );
+                                      } else if (entity.path
+                                          .toLowerCase()
+                                          .endsWith('.pdf')) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => PdfViewerPage(
+                                              filePath: entity.path,
+                                              title: p.basename(entity.path),
                                             ),
                                           ),
                                         );
