@@ -42,8 +42,9 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
           ListenableBuilder(
             listenable: _pdfController,
             builder: (context, _) {
-              if (_pdfController.totalPages == 0)
+              if (_pdfController.totalPages == 0) {
                 return const SizedBox.shrink();
+              }
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),

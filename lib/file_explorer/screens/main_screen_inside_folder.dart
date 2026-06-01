@@ -462,7 +462,34 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                   );
                                   _loadFiles();
                                 }
-                              : () => OpenFile.open(entity.path),
+                              : () {
+                                  if (entity.path.toLowerCase().endsWith(
+                                    '.md',
+                                  )) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => MarkdownPreviewScreen(
+                                          filePath: entity.path,
+                                        ),
+                                      ),
+                                    );
+                                  } else if (entity.path.toLowerCase().endsWith(
+                                    '.pdf',
+                                  )) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => PdfViewerPage(
+                                          filePath: entity.path,
+                                          title: p.basename(entity.path),
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    OpenFile.open(entity.path);
+                                  }
+                                },
                           onLongPress: () {
                             if (!_isSelecting) {
                               setState(() {
