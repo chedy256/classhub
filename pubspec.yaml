@@ -52,9 +52,7 @@ dependencies:
   sync_engine:
     path: lib/packages/sync_engine
   flutter_markdown_plus: ^1.0.7
-  flutter_widget_from_html: ^0.15.2
-  flutter_svg: ^2.0.10+1
-  fwfh_svg: ^0.8.3
+
 
 dev_dependencies:
   flutter_test:

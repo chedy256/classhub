@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:open_file/open_file.dart';
 
-class MarkdownPreviewScreen extends StatelessWidget {
+class MarkdownPreviewScreen extends StatefulWidget {
   final String filePath;
 
   const MarkdownPreviewScreen({
@@ -14,16 +14,74 @@ class MarkdownPreviewScreen extends StatelessWidget {
   });
 
   @override
+  State<MarkdownPreviewScreen> createState() => _MarkdownPreviewScreenState();
+}
+
+class _MarkdownPreviewScreenState extends State<MarkdownPreviewScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleLink(String text, String? href, String title) async {
+    if (href == null) return;
+
+    final fileDir = p.dirname(widget.filePath);
+
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      final url = Uri.parse(href);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open link')),
+          );
+        }
+      }
+      return;
+    }
+
+    if (href.startsWith('#')) {
+      return;
+    }
+
+    final targetPath = p.normalize(p.join(fileDir, href));
+    final file = File(targetPath);
+
+    if (file.existsSync()) {
+      if (targetPath.toLowerCase().endsWith('.md')) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MarkdownPreviewScreen(filePath: targetPath),
+          ),
+        );
+      } else {
+        OpenFile.open(targetPath);
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('File not found: $href')),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final fileName = p.basename(filePath);
-    final fileDir = p.dirname(filePath);
+    final fileName = p.basename(widget.filePath);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(fileName),
       ),
       body: FutureBuilder<String>(
-        future: File(filePath).readAsString(),
+        future: File(widget.filePath).readAsString(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -35,135 +93,15 @@ class MarkdownPreviewScreen extends StatelessWidget {
           }
           final content = snapshot.data ?? '';
           return Markdown(
+            controller: _scrollController,
             data: content,
-            imageDirectory: fileDir,
-            builders: {
-              'html': HtmlElementBuilder(fileDir: fileDir),
-            },
+            onTapLink: _handleLink,
             imageBuilder: (uri, title, alt) {
-              return _buildImage(uri.toString(), fileDir, alt);
+              return const SizedBox.shrink();
             },
           );
         },
       ),
     );
-  }
-
-  static Widget _buildImage(String uriPath, String fileDir, String? alt) {
-    if (uriPath.startsWith('http')) {
-      if (uriPath.toLowerCase().contains('.svg') ||
-          uriPath.toLowerCase().contains('img.shields.io') ||
-          uriPath.toLowerCase().contains('contrib.rocks')) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: SvgPicture.network(
-            uriPath,
-            placeholderBuilder: (context) => const SizedBox(
-              width: 24,
-              height: 24,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ),
-            errorBuilder: (context, error, stackTrace) => _imageError(alt),
-          ),
-        );
-      }
-      return Image.network(
-        uriPath,
-        errorBuilder: (context, error, stackTrace) => _imageError(alt),
-      );
-    }
-
-    // Handle local files
-    File imageFile;
-    if (p.isAbsolute(uriPath)) {
-      imageFile = File(uriPath);
-    } else {
-      imageFile = File(p.join(fileDir, uriPath));
-    }
-
-    if (imageFile.existsSync()) {
-      if (imageFile.path.toLowerCase().endsWith('.svg')) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: SvgPicture.file(imageFile),
-        );
-      }
-      return Image.file(
-        imageFile,
-        errorBuilder: (context, error, stackTrace) => _imageError(alt),
-      );
-    }
-
-    return _imageError(alt);
-  }
-
-  static Widget _imageError(String? alt) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.grey[200],
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.broken_image, color: Colors.grey),
-          if (alt != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              alt,
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class HtmlElementBuilder extends MarkdownElementBuilder {
-  final String fileDir;
-
-  HtmlElementBuilder({required this.fileDir});
-
-  @override
-  Widget? visitElementAfter(element, preferredStyle) {
-    final htmlContent = element.textContent;
-
-    return HtmlWidget(
-      htmlContent,
-      onTapUrl: (url) async {
-        return true;
-      },
-      factoryBuilder: () => LocalAssetHtmlFactory(fileDir),
-    );
-  }
-}
-
-class LocalAssetHtmlFactory extends WidgetFactory {
-  final String fileDir;
-
-  LocalAssetHtmlFactory(this.fileDir);
-
-  @override
-  Widget? buildImageWidget(BuildTree meta, ImageSource src) {
-    final url = src.url;
-
-    if (url.startsWith('http')) {
-      return super.buildImageWidget(meta, src);
-    }
-
-    final localPath = p.isAbsolute(url) ? url : p.join(fileDir, url);
-    final file = File(localPath);
-
-    if (file.existsSync()) {
-      if (file.path.toLowerCase().endsWith('.svg')) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: SvgPicture.file(file),
-        );
-      }
-      return Image.file(file);
-    }
-
-    return super.buildImageWidget(meta, src);
   }
 }
