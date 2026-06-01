@@ -49,6 +49,10 @@ android {
     }
 }
 
+dependencies {
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+}
+
 flutter {
     source = "../.."
 }

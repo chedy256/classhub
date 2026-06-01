@@ -11,6 +11,11 @@ import UIKit
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    // Register all auto-generated plugins first
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // Register the native PDF viewer plugin
+    let factory = PdfViewerFactory(messenger: engineBridge.binaryMessenger)
+    engineBridge.pluginRegistry.registrar(forPlugin: "PdfViewerPlugin")
+      .register(factory, withId: "native_pdf_viewer")
   }
 }

@@ -459,7 +459,21 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                                   );
                                   _loadFiles();
                                 }
-                              : () => OpenFile.open(entity.path),
+                              : () {
+                                  if (entity.path.toLowerCase().endsWith('.pdf')) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => PdfViewerPage(
+                                          filePath: entity.path,
+                                          title: name,
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    OpenFile.open(entity.path);
+                                  }
+                                },
                           onLongPress: () {
                             if (!_isSelecting) {
                               setState(() {
