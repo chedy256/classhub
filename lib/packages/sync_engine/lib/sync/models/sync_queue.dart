@@ -40,8 +40,9 @@ class SyncQueueDelta {
       downloadUrl: json['download_url'] as String?,
       operation: json['operation'] as String?,
       size: json['size'] as int?,
-      downloadHeaders: (json['download_headers'] as Map<String, dynamic>?)
-          ?.map((k, v) => MapEntry(k, v.toString())),
+      downloadHeaders: (json['download_headers'] as Map<String, dynamic>?)?.map(
+        (k, v) => MapEntry(k, v.toString()),
+      ),
     );
   }
 

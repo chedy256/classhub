@@ -52,13 +52,13 @@ class _NativePdfViewerState extends State<NativePdfViewer> {
         },
         onCreatePlatformView: (params) {
           return PlatformViewsService.initExpensiveAndroidView(
-            id: params.id,
-            viewType: 'native_pdf_viewer',
-            layoutDirection: TextDirection.ltr,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onFocus: () => params.onFocusChanged(true),
-          )
+              id: params.id,
+              viewType: 'native_pdf_viewer',
+              layoutDirection: TextDirection.ltr,
+              creationParams: creationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+              onFocus: () => params.onFocusChanged(true),
+            )
             ..addOnPlatformViewCreatedListener((id) {
               params.onPlatformViewCreated(id);
               setState(() {
@@ -86,6 +86,8 @@ class _NativePdfViewerState extends State<NativePdfViewer> {
       );
     }
 
-    return const Center(child: Text('PDF viewer not supported on this platform'));
+    return const Center(
+      child: Text('PDF viewer not supported on this platform'),
+    );
   }
 }

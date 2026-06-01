@@ -728,13 +728,16 @@ class _MainScreenState extends State<MainScreen>
                                       _loadEntries();
                                     }
                                   : () {
-if (entity.path.toLowerCase().endsWith('.md')) {
+                                      if (entity.path.toLowerCase().endsWith(
+                                        '.md',
+                                      )) {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (_) => MarkdownPreviewScreen(
-                                              filePath: entity.path,
-                                            ),
+                                            builder: (_) =>
+                                                MarkdownPreviewScreen(
+                                                  filePath: entity.path,
+                                                ),
                                           ),
                                         );
                                       } else if (entity.path

@@ -8,10 +8,7 @@ import 'package:open_file/open_file.dart';
 class MarkdownPreviewScreen extends StatefulWidget {
   final String filePath;
 
-  const MarkdownPreviewScreen({
-    super.key,
-    required this.filePath,
-  });
+  const MarkdownPreviewScreen({super.key, required this.filePath});
 
   @override
   State<MarkdownPreviewScreen> createState() => _MarkdownPreviewScreenState();
@@ -37,9 +34,9 @@ class _MarkdownPreviewScreenState extends State<MarkdownPreviewScreen> {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open link')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Could not open link')));
         }
       }
       return;
@@ -65,9 +62,9 @@ class _MarkdownPreviewScreenState extends State<MarkdownPreviewScreen> {
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('File not found: $href')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('File not found: $href')));
       }
     }
   }
@@ -77,9 +74,7 @@ class _MarkdownPreviewScreenState extends State<MarkdownPreviewScreen> {
     final fileName = p.basename(widget.filePath);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(fileName),
-      ),
+      appBar: AppBar(title: Text(fileName)),
       body: FutureBuilder<String>(
         future: File(widget.filePath).readAsString(),
         builder: (context, snapshot) {

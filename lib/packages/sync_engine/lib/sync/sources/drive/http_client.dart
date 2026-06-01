@@ -40,7 +40,8 @@ class DriveApiClient {
         };
       } else if (isIOS) {
         _cachedHeaders = {
-          'X-Ios-Bundle-Identifier': packageInfo.packageName, // Bundle ID on iOS
+          'X-Ios-Bundle-Identifier':
+              packageInfo.packageName, // Bundle ID on iOS
         };
       }
     } catch (e) {

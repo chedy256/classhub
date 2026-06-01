@@ -7,11 +7,7 @@ class PdfViewerPage extends StatefulWidget {
   final String filePath;
   final String title;
 
-  const PdfViewerPage({
-    super.key,
-    required this.filePath,
-    required this.title,
-  });
+  const PdfViewerPage({super.key, required this.filePath, required this.title});
 
   @override
   State<PdfViewerPage> createState() => _PdfViewerPageState();
@@ -46,7 +42,8 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
           ListenableBuilder(
             listenable: _pdfController,
             builder: (context, _) {
-              if (_pdfController.totalPages == 0) return const SizedBox.shrink();
+              if (_pdfController.totalPages == 0)
+                return const SizedBox.shrink();
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),

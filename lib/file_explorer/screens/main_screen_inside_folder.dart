@@ -306,7 +306,7 @@ class _InsideFolderScreenState extends State<_InsideFolderScreen>
                     _isSelecting
                         ? '${_selectedIndices.length} selected'
                         : p.basename(widget.folderPath),
-                        overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (sourceConfig != null && !_isSelecting) ...[

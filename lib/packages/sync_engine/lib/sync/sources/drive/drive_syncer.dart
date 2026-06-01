@@ -56,7 +56,9 @@ class DriveSyncer implements SourceSyncer {
               relativePath: relativePath,
               type: DeltaType.add,
               downloadUrl: _buildDownloadUrl(fileId, mimeType),
-              size: f['size'] != null ? int.tryParse(f['size'].toString()) : null,
+              size: f['size'] != null
+                  ? int.tryParse(f['size'].toString())
+                  : null,
               downloadHeaders: await _http.authHeaders,
             ),
           );
