@@ -25,6 +25,9 @@ class MockHttpClient implements HttpClient {
     }
     return _responses[url]! as Map<String, dynamic>;
   }
+
+  @override
+  void close() {}
 }
 
 void main() {

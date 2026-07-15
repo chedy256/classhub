@@ -36,7 +36,7 @@ class FailingHttpClient implements http.Client {
   }
 
   @override
-  Future<String> read(Uri url, {Map<String, String>? headers}) async =>
+  Future<String> read(Uri url, {Map<String, String>? headers}) =>
       throw UnimplementedError();
 
   @override
@@ -100,11 +100,11 @@ class MockHttpClient implements http.Client {
   }
 
   @override
-  Future<String> read(Uri url, {Map<String, String>? headers}) async =>
+  Future<String> read(Uri url, {Map<String, String>? headers}) =>
       throw UnimplementedError();
 
   @override
-  Future<Uint8List> readBytes(Uri url, {Map<String, String>? headers}) async =>
+  Future<Uint8List> readBytes(Uri url, {Map<String, String>? headers}) =>
       throw UnimplementedError();
 
   @override

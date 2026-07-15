@@ -53,7 +53,7 @@ void main() {
       test('returns true for https://github.com/owner/repo/tree/main/path', () {
         expect(
           parser.canParse(
-            'https://github.com/aliknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
+            'https://github.com/titanknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
           ),
           isTrue,
         );
@@ -92,9 +92,9 @@ void main() {
       test('parses branch with slashes in path (not branch)', () {
         // This is the key test for your issue
         final (owner, repo, branch) = parser.parseUrl(
-          'https://github.com/aliknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
+          'https://github.com/titanknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
         );
-        expect(owner, equals('aliknis'));
+        expect(owner, equals('titanknis'));
         expect(repo, equals('ISIMM-L2-Info-Cours'));
         expect(
           branch,
@@ -105,9 +105,9 @@ void main() {
       test('parses branch without https://', () {
         // This is the key test for your issue
         final (owner, repo, branch) = parser.parseUrl(
-          'github.com/aliknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
+          'github.com/titanknis/ISIMM-L2-Info-Cours/tree/main/Semestre2',
         );
-        expect(owner, equals('aliknis'));
+        expect(owner, equals('titanknis'));
         expect(repo, equals('ISIMM-L2-Info-Cours'));
         expect(
           branch,

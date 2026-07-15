@@ -97,7 +97,7 @@ void main() {
   final parser = GithubParser();
   print(
     parser.parseUrl(
-      "https://github.com/aliknis/ISIMM-L2-Info-Cours/tree/main/Semestre2",
+      "https://github.com/titanknis/ISIMM-L2-Info-Cours/tree/main/Semestre2",
     ),
   );
 }
